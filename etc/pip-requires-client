@@ -5,5 +5,4 @@ requests>=2.20.0,<=2.25.0                                   # Python HTTP for Hu
 urllib3>=1.24.2,<1.26                                       # HTTP library with thread-safe connection pooling, file post, etc.
 dogpile.cache>=0.6.5,<0.7.0; python_version < '3.0'         # Caching API plugins (0.7.0 only Py3 compatible)
 dogpile.cache>=0.6.5,<=1.1.1; python_version >= '3.0'       # Caching API plugins
-tabulate>=0.8.0,<0.9.0                                      # Pretty-print tabular data
 six>=1.12.0<1.16.0                                          # Python 2 and 3 compatibility utilities

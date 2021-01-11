@@ -37,9 +37,16 @@ from xml.parsers import expat
 
 import requests
 
+from requests.adapters import HTTPAdapter
+from urllib3.poolmanager import PoolManager
+
+from rucio.common import exception
+from rucio.rse.protocols import protocol
+
 try:
     from progressbar import ProgressBar
 except ImportError:
+    # make progressbar an optional dependency
     class ProgressBar:
         def __init__(self, maxval):
             self.maxval = maxval
@@ -51,12 +58,6 @@ except ImportError:
             print("\r|" + ("#" * nchars) + (" " * (32 - nchars)) + "|", end="")
         def finish(self):
             print("\n")
-
-from requests.adapters import HTTPAdapter
-from urllib3.poolmanager import PoolManager
-
-from rucio.common import exception
-from rucio.rse.protocols import protocol
 
 
 class TLSv1HttpAdapter(HTTPAdapter):
