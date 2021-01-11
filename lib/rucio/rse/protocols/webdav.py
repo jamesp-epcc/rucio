@@ -36,7 +36,22 @@ import xml.etree.ElementTree as ET
 from xml.parsers import expat
 
 import requests
-from progressbar import ProgressBar
+
+try:
+    from progressbar import ProgressBar
+except ImportError:
+    class ProgressBar:
+        def __init__(self, maxval):
+            self.maxval = maxval
+        def start(self):
+            print("|                                |", end="")
+            return self
+        def update(self, val):
+            nchars = int((val * 32) / self.maxval)
+            print("\r|" + ("#" * nchars) + (" " * (32 - nchars)) + "|", end="")
+        def finish(self):
+            print("\n")
+
 from requests.adapters import HTTPAdapter
 from urllib3.poolmanager import PoolManager
 
