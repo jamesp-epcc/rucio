@@ -21,3 +21,4 @@ futures>=3.2.0; python_version < '3.0'            # Clean single-source support 
 boto>=2.49.0,<2.50.0                              # S3 boto protocol
 boto3>=1.9.130,<1.17.0                            # S3 boto protocol (new version)
 pysftp>=0.2.9,<0.3                                # Used by sftp protocol
+tabulate>=0.8.0,<0.9.0                            # Pretty-print tabular data
