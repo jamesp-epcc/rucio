@@ -21,7 +21,6 @@ import argparse
 import datetime
 import logging
 import sys
-import tabulate
 
 import rucio.common.dumper.consistency as consistency
 import rucio.common.dumper.data_models as data_models
