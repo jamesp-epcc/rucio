@@ -82,6 +82,7 @@ class RSEDeterministicTranslation(object):
         self.rse = rse
         self.rse_attributes = rse_attributes if rse_attributes else {}
         self.protocol_attributes = protocol_attributes if protocol_attributes else {}
+        self.loaded_policy_modules = False
 
     @classmethod
     def supports(cls, name):
@@ -242,6 +243,34 @@ class RSEDeterministicTranslation(object):
 
         cls._DEFAULT_LFN2PFN = config.get_lfn2pfn_algorithm_default()
 
+    def query_policy_packages():
+        from rucio.core.vo import list_vos
+        import importlib
+        try:
+            multivo = config.config_get_bool('common', 'multi_vo')
+        except (NoOptionError, NoSectionError):
+            multivo = False
+        if not multivo:
+            # single policy package
+            package = config.config_get('policy', 'package')
+            try:
+                module = importlib.import_module(package)
+                if hasattr(module, 'get_lfn2pfn_algorithms'):
+                    _LFN2PFN_ALGORITHMS.update(module.get_lfn2pfn_algorithms())
+            except ImportError:
+                pass
+        else:
+            # policy package per VO
+            vos = list_vos()
+            for vo in vos:
+                package = config.config_get('policy', 'package-' + vo['vo'])
+                try:
+                    module = importlib.import_module(package)
+                    if hasattr(module, 'get_lfn2pfn_algorithms'):
+                        _LFN2PFN_ALGORITHMS.update(module.get_lfn2pfn_algorithms())
+                except ImportError:
+                    pass
+        
     def path(self, scope, name):
         """ Transforms the logical file name into a PFN's path.
 
@@ -250,8 +279,10 @@ class RSEDeterministicTranslation(object):
 
             :returns: RSE specific URI of the physical file
         """
-        # ensure that policy package is loaded in case it registers algorithms
-        import rucio.common.schema  # noqa: F401
+        # on first call, register any lfn2pfn algorithms from the policy package(s) (server only)
+        if getattr(rsemanager, 'SERVER_MODE', None) and not self.loaded_policy_modules:
+            query_policy_packages()
+            self.loaded_policy_modules = True
 
         algorithm = self.rse_attributes.get('lfn2pfn_algorithm', 'default')
         if algorithm == 'default':
