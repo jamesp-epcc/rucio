@@ -604,6 +604,7 @@ def construct_surl_BelleII(dsn, filename):
 
 _SURL_ALGORITHMS = {}
 _DEFAULT_SURL = 'DQ2'
+_loaded_policy_modules = False
 
 
 def register_surl_algorithm(surl_callable, name=None):
@@ -617,9 +618,40 @@ register_surl_algorithm(construct_surl_DQ2, 'DQ2')
 register_surl_algorithm(construct_surl_BelleII, 'BelleII')
 
 
+def _register_policy_package_surl_algorithms():
+    from rucio.core.vo import list_vos
+    import importlib
+    try:
+        multivo = config.config_get_bool('common', 'multi_vo')
+    except (NoOptionError, NoSectionError):
+        multivo = False
+    if not multivo:
+        # single policy package
+        package = config.config_get('policy', 'package')
+        try:
+            module = importlib.import_module(package)
+            if hasattr(module, 'get_surl_algorithms'):
+                _SURL_ALGORITHMS.update(module.get_surl_algorithms())
+        except ImportError:
+            pass
+    else:
+        # policy package per VO
+        vos = list_vos()
+        for vo in vos:
+            package = config.config_get('policy', 'package-' + vo['vo'])
+            try:
+                module = importlib.import_module(package)
+                if hasattr(module, 'get_surl_algorithms'):
+                    _SURL_ALGORITHMS.update(module.get_surl_algorithms())
+            except ImportError:
+                pass
+
+
 def construct_surl(dsn, filename, naming_convention=None):
-    # ensure that policy package is loaded in case it registers its own algorithms
-    import rucio.common.schema  # noqa: F401
+    if not _loaded_policy_modules:
+        # on first call, register any SURL functions from the policy packages
+        _register_policy_package_surl_algorithms()
+        _loaded_policy_modules = True
 
     if naming_convention is None or naming_convention not in _SURL_ALGORITHMS:
         naming_convention = _DEFAULT_SURL

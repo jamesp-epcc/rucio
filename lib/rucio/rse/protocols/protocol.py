@@ -29,6 +29,7 @@
 # - Eli Chadwick, <eli.chadwick@stfc.ac.uk>, 2020
 # - Luca Scotto Lavina, <scotto@lpnhe.in2p3.fr>, 2021
 # - Thomas Beermann, <thomas.beermann@cern.ch>, 2021
+# - James Perry <j.perry@epcc.ed.ac.uk>, 2021
 #
 # PY3K COMPATIBLE
 
@@ -243,7 +244,7 @@ class RSEDeterministicTranslation(object):
 
         cls._DEFAULT_LFN2PFN = config.get_lfn2pfn_algorithm_default()
 
-    def query_policy_packages():
+    def query_policy_packages(self):
         from rucio.core.vo import list_vos
         import importlib
         try:
@@ -281,7 +282,7 @@ class RSEDeterministicTranslation(object):
         """
         # on first call, register any lfn2pfn algorithms from the policy package(s) (server only)
         if getattr(rsemanager, 'SERVER_MODE', None) and not self.loaded_policy_modules:
-            query_policy_packages()
+            self.query_policy_packages()
             self.loaded_policy_modules = True
 
         algorithm = self.rse_attributes.get('lfn2pfn_algorithm', 'default')
