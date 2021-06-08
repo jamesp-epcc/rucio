@@ -257,7 +257,7 @@ class RSEDeterministicTranslation(object):
             try:
                 module = importlib.import_module(package)
                 if hasattr(module, 'get_lfn2pfn_algorithms'):
-                    _LFN2PFN_ALGORITHMS.update(module.get_lfn2pfn_algorithms())
+                    RSEDeterministicTranslation._LFN2PFN_ALGORITHMS.update(module.get_lfn2pfn_algorithms())
             except ImportError:
                 pass
         else:
@@ -268,7 +268,7 @@ class RSEDeterministicTranslation(object):
                 try:
                     module = importlib.import_module(package)
                     if hasattr(module, 'get_lfn2pfn_algorithms'):
-                        _LFN2PFN_ALGORITHMS.update(module.get_lfn2pfn_algorithms())
+                        RSEDeterministicTranslation._LFN2PFN_ALGORITHMS.update(module.get_lfn2pfn_algorithms())
                 except ImportError:
                     pass
         
