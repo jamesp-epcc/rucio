@@ -106,6 +106,12 @@ try:
 except ImportError:
     # Python 3
     import urllib.parse as urlparse
+try:
+    # Python 2
+    from ConfigParser import NoOptionError, NoSectionError
+except ImportError:
+    # Python 3
+    from configparser import NoOptionError, NoSectionError
 
 # Extra modules: Only imported if available
 EXTRA_MODULES = {'paramiko': False}
@@ -619,6 +625,7 @@ register_surl_algorithm(construct_surl_BelleII, 'BelleII')
 
 
 def _register_policy_package_surl_algorithms():
+    from rucio.common import config
     from rucio.core.vo import list_vos
     import importlib
     try:
@@ -648,6 +655,7 @@ def _register_policy_package_surl_algorithms():
 
 
 def construct_surl(dsn, filename, naming_convention=None):
+    global _loaded_policy_modules
     if not _loaded_policy_modules:
         # on first call, register any SURL functions from the policy packages
         _register_policy_package_surl_algorithms()

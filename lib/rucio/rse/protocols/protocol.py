@@ -271,7 +271,7 @@ class RSEDeterministicTranslation(object):
                         RSEDeterministicTranslation._LFN2PFN_ALGORITHMS.update(module.get_lfn2pfn_algorithms())
                 except ImportError:
                     pass
-        
+
     def path(self, scope, name):
         """ Transforms the logical file name into a PFN's path.
 
