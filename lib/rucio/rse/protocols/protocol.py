@@ -253,23 +253,23 @@ class RSEDeterministicTranslation(object):
             multivo = False
         if not multivo:
             # single policy package
-            package = config.config_get('policy', 'package')
             try:
+                package = config.config_get('policy', 'package')
                 module = importlib.import_module(package)
                 if hasattr(module, 'get_lfn2pfn_algorithms'):
                     RSEDeterministicTranslation._LFN2PFN_ALGORITHMS.update(module.get_lfn2pfn_algorithms())
-            except ImportError:
+            except (NoOptionError, NoSectionError, ImportError):
                 pass
         else:
             # policy package per VO
             vos = list_vos()
             for vo in vos:
-                package = config.config_get('policy', 'package-' + vo['vo'])
                 try:
+                    package = config.config_get('policy', 'package-' + vo['vo'])
                     module = importlib.import_module(package)
                     if hasattr(module, 'get_lfn2pfn_algorithms'):
                         RSEDeterministicTranslation._LFN2PFN_ALGORITHMS.update(module.get_lfn2pfn_algorithms())
-                except ImportError:
+                except (NoOptionError, NoSectionError, ImportError):
                     pass
 
     def path(self, scope, name):

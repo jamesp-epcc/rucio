@@ -635,23 +635,23 @@ def _register_policy_package_surl_algorithms():
         multivo = False
     if not multivo:
         # single policy package
-        package = config.config_get('policy', 'package')
         try:
+            package = config.config_get('policy', 'package')
             module = importlib.import_module(package)
             if hasattr(module, 'get_surl_algorithms'):
                 _SURL_ALGORITHMS.update(module.get_surl_algorithms())
-        except ImportError:
+        except (NoOptionError, NoSectionError, ImportError):
             pass
     else:
         # policy package per VO
         vos = list_vos()
         for vo in vos:
-            package = config.config_get('policy', 'package-' + vo['vo'])
             try:
+                package = config.config_get('policy', 'package-' + vo['vo'])
                 module = importlib.import_module(package)
                 if hasattr(module, 'get_surl_algorithms'):
                     _SURL_ALGORITHMS.update(module.get_surl_algorithms())
-            except ImportError:
+            except (NoOptionError, NoSectionError, ImportError):
                 pass
 
 
