@@ -17,10 +17,10 @@ from typing import TYPE_CHECKING
 
 from metacat.webapi import MetaCatClient
 
+from rucio.common.types import InternalScope
 from rucio.core.did_meta_plugins.did_meta_plugin_interface import DidMetaPlugin
 
-class MetaCatRucioPlugin(DidMetaPlugin):
-    
+class MetaCatRucioPlugin(DidMetaPlugin):    
     def __init__(self, client):
         super(MetaCatRucioPlugin, self).__init__()
         # FIXME: initialise this properly
@@ -59,7 +59,10 @@ class MetaCatRucioPlugin(DidMetaPlugin):
     def list_dids(self, scope, filters, did_type='collection', ignore_case=False,
                   limit=None, offset=None, long=False, recursive=False,
                   ignore_dids=None, *, session: "Optional[Session]" = None):
-        # FIXME: implement ignore_dids!
+        # FIXME: implement offset
+        # FIXME: implement ignore_case
+        if not ignore_dids:
+            ignore_dids = set()
         where_items = []
         for k, v in filters.items():
             if isinstance(v, str):
@@ -69,22 +72,35 @@ class MetaCatRucioPlugin(DidMetaPlugin):
         where_clause = " and ".join(where_items)
                   
         if did_type in ("collection", "dataset", "container"):
-            if where_clause:    where_clause = " having "+where_clouse
+            if where_clause:    where_clause = " having "+where_clause
             query = f"datasets {scope}:'%' {where_clause}"
             if recursive:
                 query += " with children recursively"
         else:
-            if where_clause:    where_clause = " where "+where_clouse
+            if where_clause:    where_clause = " where "+where_clause
             query = f"files from {scope}:'%'"
             if recursive:
                 query += " with children recursively"
-            query += where_clouse
+            query += where_clause
         
         if limit is not None:
             query += f" limit {limit}"
             
         results = self.Client.run_query(query)
-        return [item["name"] for item in results]
+        for item in results:
+            did_full = scope + ":" + item['name']
+            if did_full not in ignore_dids:
+                if long:
+                    # FIXME: see if we actually can return some of this stuff
+                    yield {
+                        'scope': InternalScope(scope),
+                        'name': item['name'],
+                        'did_type': "N/A",
+                        'bytes': "N/A",
+                        'length': "N/A"
+                    }
+                else:
+                    yield item['name']
                   
     def manages_key(self, key, *, session: "Optional[Session]" = None):
         return True
