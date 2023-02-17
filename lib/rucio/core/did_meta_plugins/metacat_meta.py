@@ -13,17 +13,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 from typing import TYPE_CHECKING
 
 from metacat.webapi import MetaCatClient
 
+from rucio.common import config
+from rucio.common import exception
 from rucio.common.types import InternalScope
 from rucio.core.did_meta_plugins.did_meta_plugin_interface import DidMetaPlugin
 
 class MetaCatRucioPlugin(DidMetaPlugin):    
-    def __init__(self, client):
+    def __init__(self, client=None):
         super(MetaCatRucioPlugin, self).__init__()
-        # FIXME: initialise this properly
+        if client is None:
+            metacat_url = config.config_get('metadata', 'metacat_url')
+            if metacat_url is None:
+                metacat_url = os.environ["METACAT_SERVER_URL"]
+            client = MetaCatClient(metacat_url)
         self.Client = client
         self.plugin_name = "METACAT"
         
