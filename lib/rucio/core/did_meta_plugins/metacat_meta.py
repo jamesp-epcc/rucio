@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import os
+import re
 from typing import TYPE_CHECKING
 
 from metacat.webapi import MetaCatClient
@@ -35,45 +36,50 @@ class MetaCatRucioPlugin(DidMetaPlugin):
         self.plugin_name = "METACAT"
         
     def get_metadata(self, scope, name, *, session: "Optional[Session]" = None):
-        info = self.Cient.get_file_info(name=f"{scope}:{name}")
+        info = self.Cient.get_file(did=f"{scope}:{name}")
+        if info is None:
+            return {}
         return info.Metadata
 
     def set_metadata(self, scope, name, key, value, recursive=False, *,
                      session: "Optional[Session]" = None):
         self.Client.update_file_meta(
             {key:value},
-            names=[f"{scope}:{name}"]
+            dids=[f"{scope}:{name}"]
         )
 
     def set_metadata_bulk(self, scope, name, meta, recursive=False, *,
                           session: "Optional[Session]" = None):
         self.Client.update_file_meta(
             meta,
-            names=[f"{scope}:{name}"]
+            dids=[f"{scope}:{name}"]
         )
 
     def delete_metadata(self, scope, name, key, *,
                         session: "Optional[Session]" = None):
         meta = self.get_metadata(scope, name)
-        try:    del meta[key]
-        except KeyError:    return
+        try:
+            del meta[key]
+        except KeyError:
+            raise exception.KeyNotFound(key)
         self.Client.update_file_meta(
             meta,
-            names=[f"{scope}:{name}"],
+            dids=[f"{scope}:{name}"],
             mode="replace"
         )
 
     def list_dids(self, scope, filters, did_type='collection', ignore_case=False,
                   limit=None, offset=None, long=False, recursive=False,
                   ignore_dids=None, *, session: "Optional[Session]" = None):
-        # FIXME: implement offset
-        # FIXME: implement ignore_case
         if not ignore_dids:
             ignore_dids = set()
         where_items = []
         for k, v in filters.items():
             if isinstance(v, str):
-                where_items.append(f"{k} = '{v}'")
+                if ignore_case:
+                    where_items.append(f"{k} ~* '{re.escape(v)}'")
+                else:
+                    where_items.append(f"{k} = '{v}'")
             else:
                 where_items.append(f"{k} = {v}")
         where_clause = " and ".join(where_items)
@@ -92,8 +98,10 @@ class MetaCatRucioPlugin(DidMetaPlugin):
         
         if limit is not None:
             query += f" limit {limit}"
+        if offset is not None:
+            query += f" skip {offset}"
             
-        results = self.Client.run_query(query)
+        results = self.Client.query(query)
         for item in results:
             did_full = scope + ":" + item['name']
             if did_full not in ignore_dids:
