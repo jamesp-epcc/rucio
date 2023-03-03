@@ -106,7 +106,6 @@ class MetaCatRucioPlugin(DidMetaPlugin):
             did_full = scope + ":" + item['name']
             if did_full not in ignore_dids:
                 if long:
-                    # FIXME: see if we actually can return some of this stuff
                     yield {
                         'scope': InternalScope(scope),
                         'name': item['name'],
