@@ -21,6 +21,7 @@ import math
 import threading
 import traceback
 from collections import defaultdict
+from typing import TYPE_CHECKING
 
 from sqlalchemy import null
 
@@ -34,6 +35,10 @@ from rucio.core.transfer import applicable_rse_transfer_limits
 from rucio.core.rse import RseCollection
 from rucio.daemons.common import run_daemon
 from rucio.db.sqla.constants import RequestState, TransferLimitDirection
+
+if TYPE_CHECKING:
+    from types import FrameType
+    from typing import Optional
 
 graceful_stop = threading.Event()
 METRICS = MetricManager(module=__name__)
@@ -60,7 +65,7 @@ def throttler(once=False, sleep_time=600, partition_wait_time=10):
     )
 
 
-def stop(signum=None, frame=None):
+def stop(signum: "Optional[int]" = None, frame: "Optional[FrameType]" = None) -> None:
     """
     Graceful exit.
     """
@@ -138,9 +143,9 @@ class RequestGrouper:
         src_info = self.rse_stats[source_rse]
         dst_info = self.rse_stats[dest_rse]
 
-        if dest_rse and not dest_rse.columns.availability_write:
+        if dest_rse and not dest_rse.columns['availability_write']:
             src_info.unavailable_destinations.add(dest_rse)
-        if source_rse and not source_rse.columns.availability_read:
+        if source_rse and not source_rse.columns['availability_read']:
             dst_info.unavailable_sources.add(source_rse)
         for limit_stat in applicable_limits:
             limit = limit_stat['limit']
@@ -408,9 +413,9 @@ def _release_requests(rse_collection: RseCollection, release_groups, logger, ses
     for (source_rse, dest_rse, activity), applicable_limits in release_groups.items():
 
         # Skip if dest_rse is blocklisted for write or src_rse is blocklisted for read
-        if dest_rse and not dest_rse.columns.availability_write:
+        if dest_rse and not dest_rse.columns['availability_write']:
             continue
-        if source_rse and not source_rse.columns.availability_read:
+        if source_rse and not source_rse.columns['availability_read']:
             continue
 
         source_rse_id = source_rse.id if source_rse else None

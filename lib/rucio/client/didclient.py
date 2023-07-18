@@ -14,13 +14,14 @@
 # limitations under the License.
 
 from datetime import datetime
-from json import dumps, loads
+from json import dumps
 
 from requests.status_codes import codes
 from urllib.parse import quote_plus
 
 from rucio.client.baseclient import BaseClient
 from rucio.client.baseclient import choice
+from rucio.common.exception import DeprecationError
 from rucio.common.utils import build_url, render_json, render_json_list, date_to_str
 
 
@@ -74,44 +75,9 @@ class DIDClient(BaseClient):
 
     def list_dids_extended(self, scope, filters, did_type='collection', long=False, recursive=False):
         """
-        List all data identifiers in a scope which match a given pattern.
-
-        :param scope: The scope name.
-        :param filters: A nested dictionary of key/value pairs like [{'key1': 'value1', 'key2.lte': 'value2'}, {'key3.gte, 'value3'}].
-                        Keypairs in the same dictionary are AND'ed together, dictionaries are OR'ed together. Keys should be suffixed
-                        like <key>.<operation>, e.g. key1 >= value1 is equivalent to {'key1.gte': value}, where <operation> belongs to one
-                        of the set {'lte', 'gte', 'gt', 'lt', 'ne' or ''}. Equivalence doesn't require an operator.
-        :param did_type: The type of the did: 'all'(container, dataset or file)|'collection'(dataset or container)|'dataset'|'container'|'file'
-        :param long: Long format option to display more information for each DID.
-        :param recursive: Recursively list DIDs content.
+        List all data identifiers in a scope which match a given pattern (DEPRECATED)
         """
-        path = '/'.join([self.DIDS_BASEURL, quote_plus(scope), 'dids', 'search_extended'])
-
-        # stringify dates.
-        if isinstance(filters, dict):   # backwards compatability for filters as single {}
-            filters = [filters]
-        for or_group in filters:
-            for key, value in or_group.items():
-                if isinstance(value, datetime):
-                    or_group[key] = date_to_str(value)
-
-        payload = {
-            'type': did_type,
-            'filters': filters,
-            'long': long,
-            'recursive': recursive
-        }
-
-        url = build_url(choice(self.list_hosts), path=path, params=payload)
-
-        r = self._send_request(url, type_='GET')
-
-        if r.status_code == codes.ok:
-            dids = self._load_json_data(r)
-            return dids
-        else:
-            exc_cls, exc_msg = self._get_exception(headers=r.headers, status_code=r.status_code, data=r.content)
-            raise exc_cls(exc_msg)
+        raise DeprecationError("Command or function has been deprecated. Please use list_dids instead.")
 
     def add_did(self, scope, name, did_type, statuses=None, meta=None, rules=None, lifetime=None, dids=None, rse=None):
         """
@@ -119,10 +85,10 @@ class DIDClient(BaseClient):
 
         :param scope: The scope name.
         :param name: The data identifier name.
-        :paran type: The data identifier type (file|dataset|container).
+        :param did_type: The data identifier type (file|dataset|container).
         :param statuses: Dictionary with statuses, e.g.g {'monotonic':True}.
-        :meta: Meta-data associated with the data identifier is represented using key/value pairs in a dictionary.
-        :rules: Replication rules associated with the data identifier. A list of dictionaries, e.g., [{'copies': 2, 'rse_expression': 'TIERS1'}, ].
+        :param meta: Meta-data associated with the data identifier is represented using key/value pairs in a dictionary.
+        :param rules: Replication rules associated with the data identifier. A list of dictionaries, e.g., [{'copies': 2, 'rse_expression': 'TIERS1'}, ].
         :param lifetime: DID's lifetime (in seconds).
         :param dids: The content.
         :param rse: The RSE name when registering replicas.
@@ -170,8 +136,8 @@ class DIDClient(BaseClient):
         :param scope: The scope name.
         :param name: The data identifier name.
         :param statuses: Dictionary with statuses, e.g.g {'monotonic':True}.
-        :meta: Meta-data associated with the data identifier is represented using key/value pairs in a dictionary.
-        :rules: Replication rules associated with the data identifier. A list of dictionaries, e.g., [{'copies': 2, 'rse_expression': 'TIERS1'}, ].
+        :param meta: Meta-data associated with the data identifier is represented using key/value pairs in a dictionary.
+        :param rules: Replication rules associated with the data identifier. A list of dictionaries, e.g., [{'copies': 2, 'rse_expression': 'TIERS1'}, ].
         :param lifetime: DID's lifetime (in seconds).
         :param files: The content.
         :param rse: The RSE name when registering replicas.
@@ -256,7 +222,7 @@ class DIDClient(BaseClient):
             attachments is: [attachment, attachment, ...]
             attachment is: {'scope': scope, 'name': name, 'dids': dids}
             dids is: [{'scope': scope, 'name': name}, ...]
-            :param ignore_duplicate: If True, ignore duplicate entries.
+        :param ignore_duplicate: If True, ignore duplicate entries.
         """
         path = '/'.join([self.DIDS_BASEURL, 'attachments'])
         url = build_url(choice(self.list_hosts), path=path)
@@ -340,7 +306,7 @@ class DIDClient(BaseClient):
 
         :param scope: The scope name.
         :param name: The dataset name.
-        :param dsns: The content.
+        :param cnts: The content.
         """
         return self.attach_dids(scope=scope, name=name, dids=cnts)
 
@@ -429,6 +395,7 @@ class DIDClient(BaseClient):
 
         :param scope: The scope name.
         :param name: The data identifier name.
+        :param plugin: Backend Metadata plugin the Rucio server should use to query data.
         """
         path = '/'.join([self.DIDS_BASEURL, quote_plus(scope), quote_plus(name), 'meta'])
         url = build_url(choice(self.list_hosts), path=path)
@@ -663,9 +630,16 @@ class DIDClient(BaseClient):
         :param account: The account.
         :param nbfiles: The number of files to register in the output dataset.
         """
-        path = '/'.join([self.DIDS_BASEURL, quote_plus(input_scope), quote_plus(input_name), quote_plus(output_scope), quote_plus(output_name), str(nbfiles), 'sample'])
+        path = '/'.join([self.DIDS_BASEURL, 'sample'])
+        data = dumps({
+            'input_scope': input_scope,
+            'input_name': input_name,
+            'output_scope': output_scope,
+            'output_name': output_name,
+            'nbfiles': str(nbfiles)
+        })
         url = build_url(choice(self.list_hosts), path=path)
-        r = self._send_request(url, type_='POST', data=dumps({}))
+        r = self._send_request(url, type_='POST', data=data)
         if r.status_code == codes.created:
             return True
         else:
@@ -715,22 +689,3 @@ class DIDClient(BaseClient):
             return self._load_json_data(r)
         exc_cls, exc_msg = self._get_exception(headers=r.headers, status_code=r.status_code, data=r.content)
         raise exc_cls(exc_msg)
-
-    def list_dids_by_meta(self, scope=None, select={}):
-        """
-        Gets all dids matching the values of the provided metadata keys
-        :param scope: the scope of the search
-        :param select: the key value pairs to search with(query in json format)
-        """
-        path = '/'.join([self.DIDS_BASEURL, 'list_dids_by_meta'])
-        payload = {}
-        if scope is not None:
-            payload['scope'] = scope
-        payload['select'] = dumps(select)
-        url = build_url(choice(self.list_hosts), path=path, params=payload)
-        r = self._send_request(url, type_='GET')
-        if r.status_code == codes.ok:
-            return loads(next(self._load_json_data(r)))
-        else:
-            exc_cls, exc_msg = self._get_exception(headers=r.headers, status_code=r.status_code, data=r.content)
-            raise exc_cls(exc_msg)

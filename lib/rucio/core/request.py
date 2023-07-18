@@ -426,7 +426,7 @@ def list_transfer_requests_and_source_replicas(
     )
 
     if not ignore_availability:
-        sub_requests = sub_requests.where(models.RSE.availability_read == true())
+        sub_requests = sub_requests.where(models.RSE.availability_write == true())
 
     if isinstance(older_than, datetime.datetime):
         sub_requests = sub_requests.where(models.Request.requested_at < older_than)
@@ -441,7 +441,7 @@ def list_transfer_requests_and_source_replicas(
     else:
         sub_requests = sub_requests.with_hint(models.Request, "INDEX(REQUESTS REQUESTS_TYP_STA_UPD_IDX)", 'oracle')
 
-    use_temp_tables = config_get_bool('core', 'use_temp_tables', default=False, session=session)
+    use_temp_tables = config_get_bool('core', 'use_temp_tables', default=True, session=session)
     if rses and use_temp_tables:
         temp_table_cls = temp_table_mngr(session).create_id_table()
 
@@ -960,11 +960,6 @@ def is_intermediate_hop(request):
     """
     Check if the request is an intermediate hop in a multi-hop transfer.
     """
-    if (request['attributes'] or {}).get('next_hop_request_id'):
-        # This is only needed during the migration. When pre- 1.28 requests still exist
-        # in the database and we have to handle them correctly.
-        # TODO: remove this if
-        return True
     if (request['attributes'] or {}).get('is_intermediate_hop'):
         return True
     return False

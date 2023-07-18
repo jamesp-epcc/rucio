@@ -420,8 +420,8 @@ class TestVORestAPI:
     def test_auth_x509(self, vo, second_vo, account_tst, account_new, rest_client):
         """ MULTI VO (REST): Test X509 authentication to multiple VOs """
         # Flasks test client doesn't support client certificates, so get tokens from API instead
-        token_tst = get_auth_token_x509('root', '/CN=Rucio User', 'unknown', None, vo=vo).get('token')
-        token_new = get_auth_token_x509('root', '/CN=Rucio User', 'unknown', None, vo=second_vo).get('token')
+        token_tst = get_auth_token_x509('root', 'CN=Rucio User', 'unknown', None, vo=vo).get('token')
+        token_new = get_auth_token_x509('root', 'CN=Rucio User', 'unknown', None, vo=second_vo).get('token')
 
         response = rest_client.get('/accounts/', headers=headers(auth(token_tst)))
         assert response.status_code == 200
@@ -727,10 +727,10 @@ class TestMultiVoClients:
         # Check the cached attribute-value results do not interfere and only give results from the appropriate VO
         attribute_value = generate_uuid()
         add_rse_attribute(new, 'test', attribute_value, 'root', vo=second_vo)
-        rses_tst_1 = list(get_rses_with_attribute_value('test', attribute_value, 'test', vo=vo))
-        rses_new_1 = list(get_rses_with_attribute_value('test', attribute_value, 'test', vo=second_vo))
-        rses_tst_2 = list(get_rses_with_attribute_value('test', attribute_value, 'test', vo=vo))
-        rses_new_2 = list(get_rses_with_attribute_value('test', attribute_value, 'test', vo=second_vo))
+        rses_tst_1 = list(get_rses_with_attribute_value('test', attribute_value, vo=vo))
+        rses_new_1 = list(get_rses_with_attribute_value('test', attribute_value, vo=second_vo))
+        rses_tst_2 = list(get_rses_with_attribute_value('test', attribute_value, vo=vo))
+        rses_new_2 = list(get_rses_with_attribute_value('test', attribute_value, vo=second_vo))
         assert len(rses_tst_1) == 0
         assert len(rses_new_1) != 0
         assert len(rses_tst_2) == 0

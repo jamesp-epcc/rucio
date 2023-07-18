@@ -19,7 +19,6 @@ Reaper is a daemon to manage file deletion.
 
 import functools
 import logging
-import os
 import random
 import threading
 import time
@@ -38,7 +37,7 @@ from rucio.common.cache import make_region_memcached
 from rucio.common.exception import (DatabaseException, RSENotFound,
                                     ReplicaUnAvailable, ReplicaNotFound, ServiceUnavailable,
                                     RSEAccessDenied, ResourceTemporaryUnavailable, SourceNotFound,
-                                    VONotFound)
+                                    VONotFound, RSEProtocolNotSupported)
 from rucio.common.logging import setup_logging
 from rucio.common.types import InternalAccount
 from rucio.common.stopwatch import Stopwatch
@@ -57,7 +56,9 @@ from rucio.daemons.common import run_daemon
 from rucio.rse import rsemanager as rsemgr
 
 if TYPE_CHECKING:
+    from types import FrameType
     from typing import Any, Callable, Optional, Tuple
+
     from rucio.daemons.common import HeartbeatHandler
 
 GRACEFUL_STOP = threading.Event()
@@ -94,8 +95,7 @@ def get_rses_to_process(rses, include_rses, exclude_rses, vos):
             vos = [v['vo'] for v in list_vos()]
         logging.log(logging.INFO, 'Reaper: This instance will work on VO%s: %s' % ('s' if len(vos) > 1 else '', ', '.join([v for v in vos])))
 
-    pid = os.getpid()
-    cache_key = 'rses_to_process_%s' % pid
+    cache_key = 'rses_to_process_1%s2%s3%s' % (str(rses), str(include_rses), str(exclude_rses))
     if multi_vo:
         cache_key += '@%s' % '-'.join(vo for vo in vos)
 
@@ -238,14 +238,18 @@ def delete_from_storage(heartbeat_handler, hb_payload, replicas, prot, rse_info,
     return deleted_files
 
 
-def _rse_deletion_hostname(rse: RseData) -> "Optional[str]":
+def _rse_deletion_hostname(rse: RseData, scheme: "Optional[str]") -> "Optional[str]":
     """
     Retrieves the hostname of the default deletion protocol
     """
     rse.ensure_loaded(load_info=True)
     for prot in rse.info['protocols']:
-        if prot['domains']['wan']['delete'] == 1:
-            return prot['hostname']
+        if scheme:
+            if prot['scheme'] == scheme and prot['domains']['wan']['delete'] != 0:
+                return prot['hostname']
+        else:
+            if prot['domains']['wan']['delete'] == 1:
+                return prot['hostname']
     return None
 
 
@@ -326,64 +330,48 @@ def __check_rse_usage(rse: RseData, greedy: bool = False, logger: "Callable[...,
     :returns: needed_free_space, only_delete_obsolete.
     """
 
+    needed_free_space = 0
     # First of all check if greedy mode is enabled for this RSE
     if greedy:
         return 1000000000000, False
 
     rse.ensure_loaded(load_limits=True, load_usage=True, load_attributes=True)
+    available_sources = {}
+    available_sources['total'] = {key['source']: key['total'] for key in rse.usage}
+    available_sources['used'] = {key['source']: key['used'] for key in rse.usage}
 
     # Get RSE limits
     min_free_space = rse.limits.get('MinFreeSpace', 0)
 
-    # Check from which sources to get used and total spaces
-    # Default is storage
+    # Check from which sources to get used and total spaces (default storage)
+    # If specified sources do not exist, only delete obsolete
     source_for_total_space = rse.attributes.get('source_for_total_space', 'storage')
+    if source_for_total_space not in available_sources['total']:
+        logger(logging.WARNING, 'RSE: %s, \'%s\' requested for source_for_total_space but cannot be found. Will only delete obsolete',
+               rse.name, source_for_total_space)
+        return 0, True
     source_for_used_space = rse.attributes.get('source_for_used_space', 'storage')
+    if source_for_used_space not in available_sources['used']:
+        logger(logging.WARNING, 'RSE: %s, \'%s\' requested for source_for_used_space but cannot be found. Will only delete obsolete',
+               rse.name, source_for_used_space)
+        return 0, True
 
     logger(logging.DEBUG, 'RSE: %s, source_for_total_space: %s, source_for_used_space: %s',
            rse.name, source_for_total_space, source_for_used_space)
 
-    # Get total, used and obsolete space
-    total_space_entry = None
-    used_space_entry = None
-    obsolete_entry = None
-    for entry in rse.usage:
-        if total_space_entry and used_space_entry and obsolete_entry:
-            break
-
-        entry_source = entry['source']
-        if not total_space_entry and entry_source == source_for_total_space:
-            total_space_entry = entry
-        if not used_space_entry and entry_source == source_for_used_space:
-            used_space_entry = entry
-        if not obsolete_entry and entry_source == 'obsolete':
-            obsolete_entry = entry
-
-    obsolete = 0
-    if obsolete_entry:
-        obsolete = obsolete_entry['used']
-
-    # If no information is available about disk space, do nothing except if there are replicas with Epoch tombstone
-    needed_free_space = 0
-    if not total_space_entry:
-        if not obsolete:
-            return needed_free_space, False
-        return obsolete, True
-    if not used_space_entry:
-        return needed_free_space, False
-
-    # Extract the total and used space
-    total, used = total_space_entry['total'], used_space_entry['used']
+    # Get total and used space
+    total = available_sources['total'][source_for_total_space]
+    used = available_sources['used'][source_for_used_space]
 
     free = total - used
     if min_free_space:
         needed_free_space = min_free_space - free
 
     # If needed_free_space negative, nothing to delete except if some Epoch tombstoned replicas
-    if needed_free_space <= 0:
-        return obsolete, True
-    else:
+    if needed_free_space > 0:
         return needed_free_space, False
+
+    return 0, True
 
 
 def reaper(rses, include_rses, exclude_rses, vos=None, chunk_size=100, once=False, greedy=False,
@@ -559,9 +547,12 @@ def _run_once(rses_to_process, chunk_size, greedy, scheme,
             percent = needed_free_space / tot_needed_free_space * 100
         logger(logging.DEBUG, 'Working on %s. Percentage of the total space needed %.2f', rse.name, percent)
 
-        rse_hostname = _rse_deletion_hostname(rse)
+        rse_hostname = _rse_deletion_hostname(rse, scheme)
         if not rse_hostname:
-            logger(logging.WARNING, 'No default delete protocol for %s', rse.name)
+            if scheme:
+                logger(logging.WARNING, 'Protocol %s not supported on %s', scheme, rse.name)
+            else:
+                logger(logging.WARNING, 'No default delete protocol for %s', rse.name)
             REGION.set('pause_deletion_%s' % rse.id, True)
             continue
 
@@ -573,7 +564,7 @@ def _run_once(rses_to_process, chunk_size, greedy, scheme,
         # List and mark BEING_DELETED the files to delete
         del_start_time = time.time()
         try:
-            use_temp_tables = config_get_bool('core', 'use_temp_tables', default=False)
+            use_temp_tables = config_get_bool('core', 'use_temp_tables', default=True)
             with METRICS.timer('list_unlocked_replicas'):
                 if only_delete_obsolete:
                     logger(logging.DEBUG, 'Will run list_and_mark_unlocked_replicas on %s. No space needed, will only delete EPOCH tombstoned replicas', rse.name)
@@ -641,6 +632,8 @@ def _run_once(rses_to_process, chunk_size, greedy, scheme,
                 delete_replicas(rse_id=rse.id, files=deleted_files)
                 logger(logging.DEBUG, 'delete_replicas successed on %s : %s replicas in %s seconds', rse.name, len(deleted_files), time.time() - del_start)
                 METRICS.counter('deletion.done').inc(len(deleted_files))
+        except RSEProtocolNotSupported:
+            logger(logging.WARNING, 'Protocol %s not supported on %s', scheme, rse.name)
         except Exception:
             logger(logging.CRITICAL, 'Exception', exc_info=True)
 
@@ -651,7 +644,7 @@ def _run_once(rses_to_process, chunk_size, greedy, scheme,
     return rses_with_more_work
 
 
-def stop(signum=None, frame=None):
+def stop(signum: "Optional[int]" = None, frame: "Optional[FrameType]" = None) -> None:
     """
     Graceful exit.
     """

@@ -27,6 +27,21 @@ _del_test_prefix = functools.partial(re.compile(r'^[Tt][Ee][Ss][Tt]_?').sub, '')
 # local imports in the fixtures to make this file loadable in e.g. client tests
 
 
+def pytest_make_parametrize_id(config, val, argname):
+    if argname == 'file_config_mock':
+        cfg = {}
+        for section, option, value in val['overrides']:
+            cfg.setdefault(section, {})[option] = value
+        return argname + str(cfg)
+    if argname == 'core_config_mock':
+        cfg = {}
+        for section, option, value in val['table_content']:
+            cfg.setdefault(section, {})[option] = value
+        return argname + str(cfg)
+    # return None to let pytest handle the formatting
+    return None
+
+
 @pytest.fixture(scope='session')
 def session_scope_prefix():
     """
@@ -251,10 +266,14 @@ def containerized_rses(rucio_client):
 
 
 @pytest.fixture
-def rse_factory(vo, function_scope_prefix):
+def rse_factory(request, vo, function_scope_prefix):
     from rucio.tests.temp_factories import TemporaryRSEFactory
 
-    with TemporaryRSEFactory(vo=vo, name_prefix=function_scope_prefix) as factory:
+    session = None
+    if 'db_session' in request.fixturenames:
+        session = request.getfixturevalue('db_session')
+
+    with TemporaryRSEFactory(vo=vo, name_prefix=function_scope_prefix, db_session=session) as factory:
         yield factory
 
 
@@ -271,10 +290,15 @@ def rse_factory_unittest(request, vo, class_scope_prefix):
 
 
 @pytest.fixture
-def did_factory(vo, mock_scope, function_scope_prefix, file_factory):
+def did_factory(request, vo, mock_scope, function_scope_prefix, file_factory, root_account):
     from rucio.tests.temp_factories import TemporaryDidFactory
 
-    with TemporaryDidFactory(vo=vo, default_scope=mock_scope, name_prefix=function_scope_prefix, file_factory=file_factory) as factory:
+    session = None
+    if 'db_session' in request.fixturenames:
+        session = request.getfixturevalue('db_session')
+
+    with TemporaryDidFactory(vo=vo, default_scope=mock_scope, name_prefix=function_scope_prefix, file_factory=file_factory,
+                             default_account=root_account, db_session=session) as factory:
         yield factory
 
 
@@ -326,7 +350,7 @@ def tag_factory_class(class_scope_prefix):
 
 
 @pytest.fixture
-def db_session(did_factory, rse_factory):
+def db_session():
     from rucio.db.sqla import session
 
     db_session = session.get_session()

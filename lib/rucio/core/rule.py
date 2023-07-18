@@ -32,7 +32,7 @@ from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError, StatementError
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.sql import func
-from sqlalchemy.sql.expression import and_, or_, text, true, null, tuple_, false
+from sqlalchemy.sql.expression import and_, or_, true, null, tuple_, false
 
 from rucio.core.account import has_account_attribute
 import rucio.core.did
@@ -47,7 +47,8 @@ from rucio.common.exception import (InvalidRSEExpression, InvalidReplicationRule
                                     ReplicationRuleCreationTemporaryFailed, InsufficientTargetRSEs, RucioException,
                                     InvalidRuleWeight, StagingAreaRuleRequiresLifetime, DuplicateRule,
                                     InvalidObject, RSEWriteBlocked, RuleReplaceFailed, RequestNotFound,
-                                    ManualRuleApprovalBlocked, UnsupportedOperation, UndefinedPolicy, InvalidValueForKey)
+                                    ManualRuleApprovalBlocked, UnsupportedOperation, UndefinedPolicy, InvalidValueForKey,
+                                    InvalidSourceReplicaExpression)
 from rucio.common.schema import validate_schema
 from rucio.common.types import InternalScope, InternalAccount
 from rucio.common.utils import str_to_date, sizefmt, chunks
@@ -151,7 +152,10 @@ def add_rule(dids, account, copies, rse_expression, grouping, weight, lifetime, 
                         raise ManualRuleApprovalBlocked()
 
             if source_replica_expression:
-                source_rses = parse_expression(source_replica_expression, filter_={'vo': vo}, session=session)
+                try:
+                    source_rses = parse_expression(source_replica_expression, filter_={'vo': vo}, session=session)
+                except InvalidRSEExpression:
+                    raise InvalidSourceReplicaExpression
             else:
                 source_rses = []
 
@@ -1765,19 +1769,11 @@ def get_injected_rules(total_workers, worker_number, limit=100, blocked_rules=[]
     :param session:            Database session in use.
     """
 
-    if session.bind.dialect.name == 'oracle':
-        query = session.query(models.ReplicationRule.id).\
-            with_hint(models.ReplicationRule, "index(rules RULES_INJECTIONSTATE_IDX)", 'oracle').\
-            filter(text("(CASE when rules.state='I' THEN rules.state ELSE null END)= 'I' ")).\
-            filter(models.ReplicationRule.state == RuleState.INJECT).\
-            order_by(models.ReplicationRule.created_at).\
-            filter(models.ReplicationRule.created_at <= datetime.utcnow())
-    else:
-        query = session.query(models.ReplicationRule.id).\
-            with_hint(models.ReplicationRule, "index(rules RULES_INJECTIONSTATE_IDX)", 'oracle').\
-            filter(models.ReplicationRule.state == RuleState.INJECT).\
-            order_by(models.ReplicationRule.created_at).\
-            filter(models.ReplicationRule.created_at <= datetime.utcnow())
+    query = session.query(models.ReplicationRule.id).\
+        with_hint(models.ReplicationRule, "index(rules RULES_STATE_IDX)", 'oracle').\
+        filter(models.ReplicationRule.state == RuleState.INJECT).\
+        order_by(models.ReplicationRule.created_at).\
+        filter(models.ReplicationRule.created_at <= datetime.utcnow())
 
     query = filter_thread_work(session=session, query=query, total_threads=total_workers, thread_id=worker_number, hash_variable='name')
 
@@ -1808,25 +1804,14 @@ def get_stuck_rules(total_workers, worker_number, delta=600, limit=10, blocked_r
     :param blocked_rules:      Blocked rules to filter out.
     :param session:            Database session in use.
     """
-    if session.bind.dialect.name == 'oracle':
-        query = session.query(models.ReplicationRule.id).\
-            with_hint(models.ReplicationRule, "index(rules RULES_STUCKSTATE_IDX)", 'oracle').\
-            filter(text("(CASE when rules.state='S' THEN rules.state ELSE null END)= 'S' ")).\
-            filter(models.ReplicationRule.state == RuleState.STUCK).\
-            filter(models.ReplicationRule.updated_at < datetime.utcnow() - timedelta(seconds=delta)).\
-            filter(or_(models.ReplicationRule.expires_at == null(),
-                       models.ReplicationRule.expires_at > datetime.utcnow(),
-                       models.ReplicationRule.locked == true())).\
-            order_by(models.ReplicationRule.updated_at)  # NOQA
-    else:
-        query = session.query(models.ReplicationRule.id).\
-            with_hint(models.ReplicationRule, "index(rules RULES_STUCKSTATE_IDX)", 'oracle').\
-            filter(models.ReplicationRule.state == RuleState.STUCK).\
-            filter(models.ReplicationRule.updated_at < datetime.utcnow() - timedelta(seconds=delta)).\
-            filter(or_(models.ReplicationRule.expires_at == null(),
-                       models.ReplicationRule.expires_at > datetime.utcnow(),
-                       models.ReplicationRule.locked == true())).\
-            order_by(models.ReplicationRule.updated_at)
+    query = session.query(models.ReplicationRule.id).\
+        with_hint(models.ReplicationRule, "index(rules RULES_STATE_IDX)", 'oracle').\
+        filter(models.ReplicationRule.state == RuleState.STUCK).\
+        filter(models.ReplicationRule.updated_at < datetime.utcnow() - timedelta(seconds=delta)).\
+        filter(or_(models.ReplicationRule.expires_at == null(),
+                   models.ReplicationRule.expires_at > datetime.utcnow(),
+                   models.ReplicationRule.locked == true())).\
+        order_by(models.ReplicationRule.updated_at)
 
     query = filter_thread_work(session=session, query=query, total_threads=total_workers, thread_id=worker_number, hash_variable='name')
 
@@ -2358,7 +2343,7 @@ def examine_rule(rule_id, *, session: "Session"):
 
                     for replica in available_replicas:
                         sources.append((get_rse_name(rse_id=replica.rse_id, session=session),
-                                        True if get_rse(rse_id=replica.rse_id, session=session).availability_read else False))
+                                        True if get_rse(rse_id=replica.rse_id, session=session)['availability_read'] else False))
 
                 result['transfers'].append({'scope': lock.scope,
                                             'name': lock.name,

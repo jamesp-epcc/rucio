@@ -26,7 +26,7 @@ from dogpile.cache.api import NoValue
 from sqlalchemy import func, inspect, Column, PrimaryKeyConstraint
 from sqlalchemy.dialects.postgresql.base import PGInspector
 from sqlalchemy.exc import IntegrityError, DatabaseError
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 from sqlalchemy.schema import CreateSchema, MetaData, Table, CreateTable, DropTable, ForeignKeyConstraint, DropConstraint
 from sqlalchemy.sql.ddl import DropSchema
 from sqlalchemy.sql.expression import select, text
@@ -148,7 +148,7 @@ def create_root_account():
     up_id = 'ddmlab'
     up_pwd = 'secret'
     up_email = 'ph-adp-ddm-lab@cern.ch'
-    x509_id = '/C=CH/ST=Geneva/O=CERN/OU=PH-ADP-CO/CN=DDMLAB Client Certificate/emailAddress=ph-adp-ddm-lab@cern.ch'
+    x509_id = 'emailAddress=ph-adp-ddm-lab@cern.ch,CN=DDMLAB Client Certificate,OU=PH-ADP-CO,O=CERN,ST=Geneva,C=CH'
     x509_email = 'ph-adp-ddm-lab@cern.ch'
     gss_id = 'ddmlab@CERN.CH'
     gss_email = 'ph-adp-ddm-lab@cern.ch'

@@ -112,12 +112,14 @@ def test_request_submitted_in_order(rse_factory, did_factory, root_account, file
     {
         "table_content": [
             ('transfers', 'use_multihop', True),
+            ('transfers', 'multihop_rse_expression', '*'),
             ('core', 'use_temp_tables', False),
         ]
     },
     {
         "table_content": [
             ('transfers', 'use_multihop', True),
+            ('transfers', 'multihop_rse_expression', '*'),
             ('core', 'use_temp_tables', True),
         ]
     }
@@ -138,9 +140,6 @@ def test_multihop_sources_created(rse_factory, did_factory, root_account, core_c
 
     jump_rses = [jump_rse1_id, jump_rse2_id, jump_rse3_id]
     all_rses = jump_rses + [src_rse_id, dst_rse_id]
-
-    for rse_id in jump_rses:
-        rse_core.add_rse_attribute(rse_id, 'available_for_multihop', True)
 
     rse_tombstone_delay = 3600
     rse_multihop_tombstone_delay = 12 * 3600
@@ -209,7 +208,12 @@ def test_multihop_sources_created(rse_factory, did_factory, root_account, core_c
     'rucio.daemons.reaper.reaper.REGION',
     'rucio.core.rse_expression_parser.REGION',  # The list of multihop RSEs is retrieved by an expression
 ]}], indirect=True)
-def test_source_avoid_deletion(caches_mock, core_config_mock, rse_factory, did_factory, root_account):
+@pytest.mark.parametrize("file_config_mock", [
+    # Run test twice: with, and without, temp tables
+    {"overrides": [('core', 'use_temp_tables', 'True')]},
+    {"overrides": [('core', 'use_temp_tables', 'False')]},
+], indirect=True)
+def test_source_avoid_deletion(caches_mock, core_config_mock, rse_factory, did_factory, root_account, file_config_mock):
     """ Test that sources on a file block it from deletion """
 
     _, reaper_region, _ = caches_mock

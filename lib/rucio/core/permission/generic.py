@@ -26,6 +26,7 @@ from rucio.db.sqla.constants import IdentityType
 if TYPE_CHECKING:
     from typing import Optional
     from sqlalchemy.orm import Session
+    from rucio.common.types import InternalAccount
 
 
 def has_permission(issuer, action, kwargs, *, session: "Optional[Session]" = None):
@@ -79,6 +80,7 @@ def has_permission(issuer, action, kwargs, *, session: "Optional[Session]" = Non
             'attach_dids_to_dids': perm_attach_dids_to_dids,
             'create_did_sample': perm_create_did_sample,
             'set_metadata': perm_set_metadata,
+            'set_metadata_bulk': perm_set_metadata_bulk,
             'set_status': perm_set_status,
             'queue_requests': perm_queue_requests,
             'set_rse_usage': perm_set_rse_usage,
@@ -110,7 +112,7 @@ def has_permission(issuer, action, kwargs, *, session: "Optional[Session]" = Non
             'list_heartbeats': perm_list_heartbeats,
             'resurrect': perm_resurrect,
             'update_lifetime_exceptions': perm_update_lifetime_exceptions,
-            'get_ssh_challenge_token': perm_get_ssh_challenge_token,
+            'get_auth_token_ssh': perm_get_auth_token_ssh,
             'get_signed_url': perm_get_signed_url,
             'add_bad_pfns': perm_add_bad_pfns,
             'del_account_identity': perm_del_account_identity,
@@ -561,6 +563,18 @@ def perm_detach_dids(issuer, kwargs, *, session: "Optional[Session]" = None):
     :returns: True if account is allowed, otherwise False
     """
     return perm_attach_dids(issuer, kwargs, session=session)
+
+
+def perm_set_metadata_bulk(issuer: "InternalAccount", kwargs: dict, *, session: "Optional[Session]" = None) -> bool:
+    """
+    Checks if an account can set a metadata on a data identifier.
+
+    :param issuer: Account identifier which issues the command.
+    :param kwargs: List of arguments for the action.
+    :param session: The DB session to use
+    :returns: True if account is allowed, otherwise False
+    """
+    return _is_root(issuer) or has_account_attribute(account=issuer, key='admin', session=session) or rucio.core.scope.is_scope_owner(scope=kwargs['scope'], account=issuer, session=session)
 
 
 def perm_set_metadata(issuer, kwargs, *, session: "Optional[Session]" = None):
@@ -1037,9 +1051,9 @@ def perm_update_lifetime_exceptions(issuer, kwargs, *, session: "Optional[Sessio
     return _is_root(issuer) or has_account_attribute(account=issuer, key='admin', session=session)
 
 
-def perm_get_ssh_challenge_token(issuer, kwargs, *, session: "Optional[Session]" = None):
+def perm_get_auth_token_ssh(issuer: "InternalAccount", kwargs: dict, *, session: "Optional[Session]" = None) -> bool:
     """
-    Checks if an account can request a challenge token.
+    Checks if an account can request an ssh token.
 
     :param issuer: Account identifier which issues the command.
     :param session: The DB session to use

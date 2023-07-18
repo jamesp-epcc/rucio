@@ -20,36 +20,43 @@ or if they are the last remaining copy, on how many suspicious replicas are on a
 Consequently, automatic replica recovery is triggered via necromancer daemon, which creates a rule for such bad replica(s).
 """
 
+import functools
+import json
 import logging
+import re
 import threading
 import time
 from datetime import datetime, timedelta
 from sys import argv
-from typing import List, Any, Optional
-import re
-
-import functools
-import json
+from typing import TYPE_CHECKING, Any, List, Optional
 
 import rucio.db.sqla.util
-from rucio.db.sqla.util import get_db_time
 from rucio.common.config import config_get_bool
+from rucio.common.constants import SuspiciousAvailability
 from rucio.common.exception import DatabaseException, VONotFound
 from rucio.common.logging import setup_logging
 from rucio.common.types import InternalAccount
-from rucio.common.constants import SuspiciousAvailability
 from rucio.core.did import get_metadata
-from rucio.core.replica import list_replicas, get_suspicious_files, add_bad_pfns, declare_bad_file_replicas, get_suspicious_reason
+from rucio.core.replica import (
+    add_bad_pfns,
+    declare_bad_file_replicas,
+    get_suspicious_files,
+    get_suspicious_reason,
+    list_replicas,
+)
+from rucio.core.rse_expression_parser import parse_expression
 from rucio.core.rule import add_rule
 from rucio.core.vo import list_vos
-from rucio.core.rse_expression_parser import parse_expression
 from rucio.daemons.common import run_daemon
+from rucio.db.sqla.util import get_db_time
 
+if TYPE_CHECKING:
+    from types import FrameType
 
 GRACEFUL_STOP = threading.Event()
 
 
-def declare_suspicious_replicas_bad(once: bool = False, younger_than: int = 3, nattempts: int = 10, vos: Optional[List[str]] = None, limit_suspicious_files_on_rse: int = 5, sleep_time: int = 3600, active_mode: bool = False) -> None:
+def declare_suspicious_replicas_bad(once: bool = False, younger_than: int = 3, nattempts: int = 10, vos: Optional[List[str]] = None, limit_suspicious_files_on_rse: int = 5, json_file_name: str = "/opt/rucio/etc/suspicious_replica_recoverer.json", sleep_time: int = 3600, active_mode: bool = False) -> None:
     """
     Main loop to check for available replicas which are labeled as suspicious.
 
@@ -87,12 +94,13 @@ def declare_suspicious_replicas_bad(once: bool = False, younger_than: int = 3, n
             nattempts=nattempts,
             vos=vos,
             limit_suspicious_files_on_rse=limit_suspicious_files_on_rse,
+            json_file_name=json_file_name,
             active_mode=active_mode
         ),
     )
 
 
-def run_once(heartbeat_handler: Any, younger_than: int, nattempts: int, vos: Optional[List[str]], limit_suspicious_files_on_rse: int, active_mode: int, **_kwargs) -> bool:
+def run_once(heartbeat_handler: Any, younger_than: int, nattempts: int, vos: Optional[List[str]], limit_suspicious_files_on_rse: int, json_file_name: str, active_mode: int, **_kwargs) -> bool:
 
     worker_number, total_workers, logger = heartbeat_handler.live()
 
@@ -116,16 +124,17 @@ def run_once(heartbeat_handler: Any, younger_than: int, nattempts: int, vos: Opt
     start = time.time()
 
     try:
-        json_file = open("/opt/rucio/etc/suspicious_replica_recoverer.json")
+        json_file = open(json_file_name, mode="r")
+        logger(logging.INFO, "JSON file has been opened.")
     except:
-        logger(logging.WARNING, "An error occured whilst trying to open the JSON file.")
+        logger(logging.WARNING, "An error occured while trying to open the JSON file.")
         must_sleep = True
         return must_sleep
 
     try:
         json_data = json.load(json_file)
-    except ValueError:
-        logger(logging.WARNING, "No JSON object could be decoded.")
+    except ValueError as e:
+        logger(logging.WARNING, "No JSON object could be decoded. Error: %s", e)
         return True
 
     # Checking that the json file is formatedd properly.
@@ -358,46 +367,32 @@ def run_once(heartbeat_handler: Any, younger_than: int, nattempts: int, vos: Opt
 
                         file_metadata_datatype = str(file_metadata["datatype"])
                         file_metadata_scope = str(file_metadata["scope"])
-                        datatype_found_in_file = False
-                        scope_found_in_file = False
-                        wildcard_found_in_file = False
                         action = ""
-                        for i in json_data:
-                            # Check if a policy has been set for the specific datatype or scope
-                            # or if there are any wildcard policies regarding the scope.
-                            # Datatype action has priority over scope action.
-                            # Specific scope has priority over wildcard scope.
-                            if "datatype" in i:
-                                if file_metadata_datatype in i["datatype"]:
-                                    try:
-                                        # action = i["datatype_action"]
-                                        action = i["action"]
-                                        datatype_found_in_file = True
-                                        break
-                                    except:
-                                        logger(logging.WARNING, "RSE: %s, replica name %s, surl %s: Datatype %s found in the policy library, but an error occured while retrieving the policy assigned to it. No action will be taken.",
-                                               rse_key, replica_key, recoverable_replicas[vo][rse_key][replica_key]['surl'], file_metadata_datatype)
-                                        break
-                            if ("scope" in i) and not datatype_found_in_file:
-                                if file_metadata_scope in i["scope"]:
-                                    try:
-                                        # action = i["scope_action"]
-                                        action = i["action"]
-                                        scope_found_in_file = True
-                                    except:
-                                        logger(logging.WARNING, "RSE: %s, replica name %s, surl %s: Scope %s found in the policy library, but an error occured while retrieving the policy assigned to it. No action will be taken.",
-                                               rse_key, replica_key, recoverable_replicas[vo][rse_key][replica_key]['surl'], file_scope)
-                                        break
-                            if ("scope_wildcard" in i) and not (datatype_found_in_file or scope_found_in_file):
-                                if (re.match(j, file_metadata_scope) for j in i["scope_wildcard"]):
-                                    try:
-                                        # action = i["scope_action"]
-                                        action = i["action"]
-                                        wildcard_found_in_file = True
-                                    except:
-                                        logger(logging.WARNING, "RSE: %s, replica name %s, surl %s: Wildcard-match for the scope (%s) found in the policy library, but an error occured while retrieving the policy assigned to it. No action will be taken.",
-                                               rse_key, replica_key, recoverable_replicas[vo][rse_key][replica_key]['surl'], file_scope, i["action"])
-                                        break
+                        for policy in json_data:
+                            match_scope = False
+                            match_datatype = False
+
+                            if not policy.get("scope", []):
+                                match_scope = True
+                            for scope in policy.get("scope", []):
+                                if re.match(scope, file_metadata_scope):
+                                    match_scope = True
+                                    break
+
+                            if not policy.get("datatype", []):
+                                match_datatype = True
+                            for datatype in policy.get("datatype", []):
+                                if re.match(datatype, file_metadata_datatype):
+                                    match_datatype = True
+                                    break
+
+                            if match_scope and match_datatype:
+                                action = policy["action"]
+                                logger(logging.INFO, "The action that will be performed is %s", action)
+                                break
+
+                        if not action:
+                            logger(logging.WARNING, "No recognised actions (ignore/declare bad) found in policy file (etc/suspicious_replica_recoverer.json). Replica will be ignored by default.")
 
                         if action:
                             if action == "ignore":
@@ -416,16 +411,6 @@ def run_once(heartbeat_handler: Any, younger_than: int, nattempts: int, vos: Opt
                                         checksum += 1
                                         files_to_be_declared_bad.append(recoverable_replicas[vo][rse_key][replica_key])
                                         break
-                            else:
-                                if datatype_found_in_file:
-                                    logger(logging.WARNING, "RSE: %s, replica name %s, surl %s: Match for the metadata 'datatype' (%s) of replica found in policy library, but the associated action is invalid. No aciton will be taken.",
-                                           rse_key, replica_key, recoverable_replicas[vo][rse_key][replica_key]['surl'], file_metadata_datatype)
-                                elif scope_found_in_file:
-                                    logger(logging.WARNING, "RSE: %s, replica name %s, surl %s: Match for the specific scope (%s) of replica found in policy library, but but the associated action is invalid. No aciton will be taken.",
-                                           rse_key, replica_key, recoverable_replicas[vo][rse_key][replica_key]['surl'], file_scope)
-                                elif wildcard_found_in_file:
-                                    logger(logging.WARNING, "RSE: %s, replica name %s, surl %s: Wildcard-match for the scope (%s) of replica found in policy library, but but the associated action is invalid. No aciton will be taken.",
-                                           rse_key, replica_key, recoverable_replicas[vo][rse_key][replica_key]['surl'], file_scope)
                         else:
                             # If no policy has been set, default to ignoring the file (no action taken).
                             files_to_be_ignored.append(recoverable_replicas[vo][rse_key][replica_key])
@@ -460,7 +445,7 @@ def run_once(heartbeat_handler: Any, younger_than: int, nattempts: int, vos: Opt
     return must_sleep
 
 
-def run(once: bool = False, younger_than: int = 3, nattempts: int = 10, vos: List[str] = None, limit_suspicious_files_on_rse: int = 5, sleep_time: int = 3600, active_mode: bool = False) -> None:
+def run(once: bool = False, younger_than: int = 3, nattempts: int = 10, vos: List[str] = None, limit_suspicious_files_on_rse: int = 5, json_file_name: str = "/opt/rucio/etc/suspicious_replica_recoverer.json", sleep_time: int = 3600, active_mode: bool = False) -> None:
     """
     Starts up the Suspicious-Replica-Recoverer threads.
     """
@@ -483,6 +468,7 @@ def run(once: bool = False, younger_than: int = 3, nattempts: int = 10, vos: Lis
                                  'nattempts': nattempts,
                                  'vos': vos,
                                  'limit_suspicious_files_on_rse': limit_suspicious_files_on_rse,
+                                 'json_file_name': json_file_name,
                                  'sleep_time': sleep_time,
                                  'active_mode': active_mode})
     t.start()
@@ -493,7 +479,7 @@ def run(once: bool = False, younger_than: int = 3, nattempts: int = 10, vos: Lis
         t.join(timeout=3.14)
 
 
-def stop():
+def stop(signum: "Optional[int]" = None, frame: "Optional[FrameType]" = None) -> None:
     """
     Graceful exit.
     """

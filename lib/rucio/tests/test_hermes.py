@@ -27,7 +27,7 @@ import time
 
 from rucio.common.config import config_get
 from rucio.core.message import add_message, retrieve_messages, truncate_messages
-from rucio.daemons.hermes import hermes, hermes2
+from rucio.daemons.hermes import hermes
 from rucio.tests.common import rse_name_generator, skip_missing_elasticsearch_influxdb_in_env
 
 
@@ -49,56 +49,6 @@ class MyListener(object):
         message = frame.body
         self.count += 1
         self.messages.append(loads(message))
-
-
-@skip_missing_elasticsearch_influxdb_in_env
-@pytest.mark.noparallel(reason="fails when run in parallel")
-@pytest.mark.parametrize(
-    "core_config_mock",
-    [
-        {
-            "table_content": [
-                ("hermes", "services_list", "influx,activemq,elastic,email"),
-            ]
-        }
-    ],
-    indirect=True,
-)
-@pytest.mark.parametrize(
-    "caches_mock",
-    [
-        {
-            "caches_to_mock": [
-                "rucio.core.config.REGION",
-            ]
-        }
-    ],
-    indirect=True,
-)
-def test_hermes(core_config_mock, caches_mock):
-    """HERMES (DAEMON): Test the messaging daemon."""
-    truncate_messages()
-    for i in range(1, 4):
-        add_message("test-type_%i" % i, {"test": i})
-        add_message(
-            "email",
-            {
-                "to": config_get("messaging-hermes", "email_test").split(","),
-                "subject": "Half-Life %i" % i,
-                "body": """
-                              Good morning, and welcome to the Black Mesa Transit System.
-
-                              This automated train is provided for the security and convenience of
-                              the Black Mesa Research Facility personnel. The time is eight-forty
-                              seven A.M... Current outside temperature is ninety three degrees with
-                              an estimated high of one hundred and five. Before exiting the train,
-                              be sure to check your area for personal belongings.
-
-                              Thank you, and have a very safe, and productive day.""",
-            },
-        )
-
-    hermes.run(once=True, send_email=False)
 
 
 @pytest.mark.noparallel(reason="fails when run in parallel")
@@ -143,7 +93,7 @@ def test_hermes(core_config_mock, caches_mock):
     ],
     indirect=True,
 )
-def test_hermes2(core_config_mock, caches_mock):
+def test_hermes(core_config_mock, caches_mock):
     """HERMES (DAEMON): Test the messaging daemon."""
     truncate_messages()
     mock_rse = rse_name_generator()
@@ -217,12 +167,12 @@ def test_hermes2(core_config_mock, caches_mock):
     assert service_dict["activemq"] == 3
     assert service_dict["email"] == 3
 
-    # Run Hermes2
+    # Run Hermes
     # The messages of event_type email should be submitted and removed from the list
     # The messages of event-type blahblah should be removed from the list for service influx since this event-type is not supported by influx
     # The messages of event-type blahblah should be submitted to elastic
     # The messages of event-type blahblah should be submitted to ActiveMQ
-    hermes2.hermes2(once=True)
+    hermes.hermes(once=True)
     service_dict = {"influx": 0, "elastic": 0, "email": 0, "activemq": 0}
     messages = retrieve_messages(50, old_mode=False)
     for message in messages:
@@ -253,8 +203,8 @@ def test_hermes2(core_config_mock, caches_mock):
     assert service_dict["activemq"] == 3
     assert service_dict["email"] == 0
 
-    # Run Hermes2
-    hermes2.hermes2(once=True)
+    # Run Hermes
+    hermes.hermes(once=True)
     service_dict = {"influx": 0, "elastic": 0, "email": 0, "activemq": 0}
     messages = retrieve_messages(50, old_mode=False)
     for message in messages:

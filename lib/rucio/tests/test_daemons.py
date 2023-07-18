@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
+from unittest import mock
 
 import pytest
 
@@ -27,7 +27,7 @@ from rucio.daemons.c3po import c3po
 from rucio.daemons.cache import consumer
 from rucio.daemons.conveyor import finisher, poller, receiver, stager, submitter, throttler, preparer
 from rucio.daemons.follower import follower
-from rucio.daemons.hermes import hermes, hermes2
+from rucio.daemons.hermes import hermes
 from rucio.daemons.judge import cleaner, evaluator, injector, repairer
 from rucio.daemons.oauthmanager import oauthmanager
 from rucio.daemons.reaper import dark_reaper, light_reaper, reaper
@@ -35,12 +35,6 @@ from rucio.daemons.replicarecoverer import suspicious_replica_recoverer
 from rucio.daemons.tracer import kronos
 from rucio.daemons.transmogrifier import transmogrifier
 from rucio.daemons.undertaker import undertaker
-
-if sys.version_info >= (3, 3):
-    from unittest import mock
-else:
-    import mock
-
 
 DAEMONS = [
     account,
@@ -62,7 +56,6 @@ DAEMONS = [
     preparer,
     follower,
     hermes,
-    hermes2,
     cleaner,
     evaluator,
     injector,

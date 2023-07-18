@@ -14,7 +14,6 @@
 # limitations under the License.
 
 from datetime import datetime, timedelta
-import os
 
 import pytest
 
@@ -23,7 +22,7 @@ from rucio.api import scope
 from rucio.db.sqla.util import json_implemented
 from rucio.common import exception
 from rucio.common.exception import (DataIdentifierNotFound, DataIdentifierAlreadyExists,
-                                    InvalidPath, KeyNotFound, UnsupportedOperation,
+                                    InvalidPath, UnsupportedOperation,
                                     UnsupportedStatus, ScopeNotFound, FileAlreadyExists, FileConsistencyMismatch)
 from rucio.common.types import InternalAccount, InternalScope
 from rucio.common.utils import generate_uuid
@@ -452,9 +451,6 @@ class TestDIDClients:
         for dsn in dsns:
             assert dsn in results
 
-        with pytest.raises(KeyNotFound):
-            did_client.list_dids(tmp_scope, {'NotReallyAKey': 'NotReallyAValue'})
-
     @pytest.mark.dirty
     @pytest.mark.noparallel(reason='uses pre-defined scope')
     def test_add_did(self, vo, did_client, rse_factory):
@@ -529,7 +525,6 @@ class TestDIDClients:
         did_client.close(scope=tmp_scope, name=tmp_dsn)
 
     @pytest.mark.dirty
-    @pytest.mark.skipif(os.environ.get('POLICY') != 'atlas', reason='REST API only works with ATLAS DID convention')
     @pytest.mark.noparallel(reason='uses pre-defined scope')
     def test_create_sample(self, vo, root_account, did_client, rse_factory):
         """ DATA IDENTIFIERS (CLIENT): Create a sample"""

@@ -32,6 +32,7 @@ from rucio.db.sqla.constants import RequestState, RequestType
 from rucio.daemons.common import run_daemon
 
 if TYPE_CHECKING:
+    from types import FrameType
     from typing import Optional, List
     from sqlalchemy.orm import Session
     from rucio.daemons.common import HeartbeatHandler
@@ -39,7 +40,7 @@ if TYPE_CHECKING:
 graceful_stop = threading.Event()
 
 
-def stop():
+def stop(signum: "Optional[int]" = None, frame: "Optional[FrameType]" = None) -> None:
     """
     Graceful exit.
     """
@@ -47,7 +48,7 @@ def stop():
     graceful_stop.set()
 
 
-def run(once=False, threads=1, sleep_time=10, bulk=100):
+def run(once=False, threads=1, sleep_time=10, bulk=100, ignore_availability: bool = False):
     """
     Running the preparer daemon either once or by default in a loop until stop is called.
     """
@@ -58,7 +59,7 @@ def run(once=False, threads=1, sleep_time=10, bulk=100):
 
     def preparer_kwargs():
         # not sure if this is needed for threading.Thread, but it always returns a fresh dictionary
-        return {'once': once, 'sleep_time': sleep_time, 'bulk': bulk}
+        return {'once': once, 'sleep_time': sleep_time, 'bulk': bulk, 'ignore_availability': ignore_availability}
 
     threads = [threading.Thread(target=preparer, name=f'conveyor-preparer-{i}', kwargs=preparer_kwargs(), daemon=True) for i in range(threads)]
     for thr in threads:
@@ -84,7 +85,7 @@ def run(once=False, threads=1, sleep_time=10, bulk=100):
     logging.info('conveyor-preparer: stopped')
 
 
-def preparer(once, sleep_time, bulk, partition_wait_time=10):
+def preparer(once, sleep_time, bulk, ignore_availability: bool, partition_wait_time: int = 10):
     # Make an initial heartbeat so that all instanced daemons have the correct worker number on the next try
     logger_prefix = executable = 'conveyor-preparer'
     transfertools = config_get_list('conveyor', 'transfertool', False, None)
@@ -100,6 +101,7 @@ def preparer(once, sleep_time, bulk, partition_wait_time=10):
             run_once,
             transfertools=transfertools,
             bulk=bulk,
+            ignore_availability=ignore_availability,
         ),
         activities=None,
     )
@@ -110,6 +112,7 @@ def run_once(
         bulk: int = 100,
         heartbeat_handler: "Optional[HeartbeatHandler]" = None,
         session: "Optional[Session]" = None,
+        ignore_availability: bool = False,
         **kwargs
 ) -> bool:
     if heartbeat_handler:
@@ -124,14 +127,15 @@ def run_once(
     requests_handled = 0
     try:
         admin_accounts = list_transfer_admin_accounts()
-        topology = Topology.create_from_config(logger=logger)
+        topology = Topology.create_from_config(logger=logger, ignore_availability=ignore_availability)
         requests_with_sources = list_transfer_requests_and_source_replicas(
             total_workers=total_workers,
             worker_number=worker_number,
             limit=bulk,
             request_state=RequestState.PREPARING,
             request_type=[RequestType.TRANSFER, RequestType.STAGEIN],
-            session=session
+            session=session,
+            ignore_availability=ignore_availability
         )
         ret = build_transfer_paths(
             topology=topology,
@@ -154,13 +158,13 @@ def run_once(
             reqs_no_source.update(reqs_no_transfertool)
             if reqs_no_source:
                 logger(logging.INFO, "Marking requests as no-sources: %s", reqs_no_source)
-                set_requests_state_if_possible(reqs_no_source, RequestState.NO_SOURCES, logger=logger)
+                set_requests_state_if_possible(reqs_no_source, RequestState.NO_SOURCES, logger=logger, session=session)
             if reqs_only_tape_source:
                 logger(logging.INFO, "Marking requests as only-tape-sources: %s", reqs_only_tape_source)
-                set_requests_state_if_possible(reqs_only_tape_source, RequestState.ONLY_TAPE_SOURCES, logger=logger)
+                set_requests_state_if_possible(reqs_only_tape_source, RequestState.ONLY_TAPE_SOURCES, logger=logger, session=session)
             if reqs_scheme_mismatch:
                 logger(logging.INFO, "Marking requests as scheme-mismatch: %s", reqs_scheme_mismatch)
-                set_requests_state_if_possible(reqs_scheme_mismatch, RequestState.MISMATCH_SCHEME, logger=logger)
+                set_requests_state_if_possible(reqs_scheme_mismatch, RequestState.MISMATCH_SCHEME, logger=logger, session=session)
     except RucioException:
         logger(logging.ERROR, 'errored with a RucioException, retrying later', exc_info=True)
         updated_msg = 'errored'

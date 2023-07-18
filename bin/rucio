@@ -243,6 +243,19 @@ def get_client(args):
     return client
 
 
+def __resolve_containers_to_datasets(scope, name, client):
+    """
+    Helper function to resolve a container into its dataset content.
+    """
+    datasets = []
+    for did in client.list_content(scope, name):
+        if did['type'] == 'DATASET':
+            datasets.append({'scope': did['scope'], 'name': did['name']})
+        elif did['type'] == 'CONTAINER':
+            datasets.extend(__resolve_containers_to_datasets(did['scope'], did['name'], client))
+    return datasets
+
+
 @exception_handler
 def ping(args):
     """
@@ -588,62 +601,10 @@ def list_dids_extended(args):
     """
     %(prog)s list-dids-extended scope[:*|:name] [--filter 'key=value' | --recursive]
 
-    List the data identifiers for a given scope.
+    List the data identifiers for a given scope (DEPRECATED).
     """
-    client = get_client(args)
-    filters = {}
-    type_ = 'collection'
-    table = []
-
-    try:
-        scope, name = get_scope(args.did[0], client)
-        if name == '':
-            name = '*'
-    except InvalidObject:
-        scope = args.did[0]
-        name = '*'
-
-    if scope not in client.list_scopes():
-        logger.error('Scope not found')
-        return FAILURE
-
-    if args.recursive and '*' in name:
-        logger.error('Option recursive cannot be used with wildcards')
-        return FAILURE
-    else:
-        if filters:
-            if ('name' in filters) and (name != '*'):
-                logger.error('Must have a wildcard in did name if filtering by name')
-                return FAILURE
-
-    try:
-        filters, type_ = parse_did_filter_from_string_fe(args.filter, name)
-    except InvalidType as error:
-        logger.error(error)
-        return FAILURE
-    except DuplicateCriteriaInDIDFilter as error:
-        logger.error(error)
-        return FAILURE
-    except DIDFilterSyntaxError as error:
-        logger.error(error)
-        return FAILURE
-    except ValueError as error:
-        logger.error(error)
-        return FAILURE
-    except Exception as e:
-        logger.error(e)
-        return FAILURE
-
-    for did in client.list_dids_extended(scope, filters=filters, did_type=type_, long=True, recursive=args.recursive):
-        table.append(['%s:%s' % (did['scope'], did['name']), did['did_type']])
-
-    if args.short:
-        for did, _ in table:
-            print(did)
-    else:
-        print(tabulate(table, tablefmt=tablefmt, headers=['SCOPE:NAME', '[DID TYPE]']))
-
-    return SUCCESS
+    logger.error("This command has been deprecated. Please use list_dids instead.")
+    return FAILURE
 
 
 @exception_handler
@@ -1237,30 +1198,6 @@ def delete_metadata(args):
 
 
 @exception_handler
-def list_dids_by_meta(args):
-    """
-    %(prog)s list-dids-by-meta [options] <field1=value1 field2=value2 ...>
-
-    List dids by metadata key values
-    """
-    client = get_client(args)
-    select = {}
-    for key_value in args.key_values:
-        if len(key_value.split('=')) != 2:
-            logger.error("Usage: rucio list-dids-by-meta key1=value1 key2=value2 ......")
-            return FAILURE
-        else:
-            key, value = key_value.split('=')
-            select[key] = value
-    dids = client.list_dids_by_meta(scope=args.scope, select=select)
-    if not dids:
-        print('No DIDs found.')
-    for did in dids:
-        print('%s:%s' % (did['scope'], did['name']))
-    return SUCCESS
-
-
-@exception_handler
 def add_rule(args):
     """
     %(prog)s add-rule <did> <copies> <rse-expression> [options]
@@ -1799,12 +1736,16 @@ def add_lifetime_exception(args):
         logger.error('inputfile is mandatory')
         return FAILURE
     with open(args.inputfile) as infile:
-        dids = list(filter(None, [line.strip() for line in infile]))
+        dids = list(set(line.strip() for line in infile))
 
     dids_list = []
     containers = []
     datasets = []
-    error_types = ['Total DIDs', 'DID not submitted because it is a file', 'DID not submitted because it is a container', 'DID not submitted because it is not part of the lifetime campaign', 'DID successfully submitted']
+    error_types = ['Total DIDs',
+                   'DID not submitted because it is a file',
+                   'DID that are containers and were resolved',
+                   'DID not submitted because it is not part of the lifetime campaign',
+                   'DID successfully submitted including the one from containers resolved']
     for did in dids:
         scope, name = get_scope(did, client)
         dids_list.append({'scope': scope, 'name': name})
@@ -1836,11 +1777,20 @@ def add_lifetime_exception(args):
         logger.warning('%s:%s does not exist' % (scope, name))
 
     if containers:
-        logger.error('One or more DIDs are containers. They must be resolved into a list of datasets to request exception. Full list below')
+        logger.warning('One or more DIDs are containers. They will be resolved into a list of datasets to request exception. Full list below')
         for container in containers:
-            logger.error('%s:%s' % (container['scope'], container['name']))
-        logger.error('Please take action. Submission aborted')
-        return FAILURE
+            logger.info('Resolving %s:%s into datasets :' % (container['scope'], container['name']))
+            list_datasets = __resolve_containers_to_datasets(container['scope'], container['name'], client)
+            for chunk in chunks(list_datasets, chunk_limit):
+                for meta in client.get_metadata_bulk(chunk):
+                    scope, name = meta['scope'], meta['name']
+                    logger.debug('%s:%s' % (scope, name))
+                    if not meta['eol_at']:
+                        logger.warning('%s:%s is not affected by the lifetime model' % (scope, name))
+                        summary[3] += 1
+                    else:
+                        logger.info('%s:%s will be declared' % (scope, name))
+                        datasets.append({'scope': scope, 'name': name})
 
     if not datasets:
         logger.error('Nothing to submit')
@@ -2214,10 +2164,6 @@ You can filter by key/value, e.g.::
     +-------------------------------------------+--------------+''')
 
     list_extended_parser.set_defaults(function=list_dids_extended)
-    list_extended_parser.add_argument('--recursive', dest='recursive', action='store_true', default=False, help='List data identifiers recursively.')
-    list_extended_parser.add_argument('--filter', dest='filter', action='store', help='Single or logically combined filtering expression(s) either in the form <key><operator><value> or <value1><operator1><key><operator2><value2> (compound inequality). Operators must belong to the set of (<=, >=, ==, !=, >, <). The following conventions for combining expressions are used: ";" represents the logical OR operator; "," represents the logical AND operator.')  # noqa: E501
-    list_extended_parser.add_argument('--short', dest='short', action='store_true', help='Just dump the list of DIDs.')
-    list_extended_parser.add_argument(dest='did', nargs=1, action='store', default=None, help='Data IDentifier pattern')
 
     # The list parent-dids command
     list_parent_parser = subparsers.add_parser('list-parent-dids', help='List parent DIDs for a given DID', description='List all parents Data IDentifier that contains the target Data IDentifier.',
