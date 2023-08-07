@@ -36,7 +36,7 @@ class MetaCatRucioPlugin(DidMetaPlugin):
         self.plugin_name = "METACAT"
         
     def get_metadata(self, scope, name, *, session: "Optional[Session]" = None):
-        info = self.Cient.get_file(did=f"{scope}:{name}")
+        info = self.Client.get_file(did=f"{scope}:{name}")
         if info is None:
             return {}
         return info.Metadata
