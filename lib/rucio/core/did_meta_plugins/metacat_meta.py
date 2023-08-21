@@ -39,20 +39,20 @@ class MetaCatRucioPlugin(DidMetaPlugin):
         info = self.Client.get_file(did=f"{scope}:{name}")
         if info is None:
             return {}
-        return info.Metadata
+        return info["metadata"]
 
     def set_metadata(self, scope, name, key, value, recursive=False, *,
                      session: "Optional[Session]" = None):
-        self.Client.update_file_meta(
-            {key:value},
-            dids=[f"{scope}:{name}"]
+        self.Client.update_file(
+            did=f"{scope}:{name}",
+            metadata={key:value}
         )
 
     def set_metadata_bulk(self, scope, name, meta, recursive=False, *,
                           session: "Optional[Session]" = None):
-        self.Client.update_file_meta(
-            meta,
-            dids=[f"{scope}:{name}"]
+        self.Client.update_file(
+            did=f"{scope}:{name}",
+            metadata=meta
         )
 
     def delete_metadata(self, scope, name, key, *,
@@ -62,12 +62,24 @@ class MetaCatRucioPlugin(DidMetaPlugin):
             del meta[key]
         except KeyError:
             raise exception.KeyNotFound(key)
-        self.Client.update_file_meta(
-            meta,
-            dids=[f"{scope}:{name}"],
-            mode="replace"
+        self.Client.update_file(
+            metadata=meta,
+            did=f"{scope}:{name}",
+            replace=True
         )
 
+    # support for case insensitive matching is currently broken in MetaCat
+    # so convert string to a regular expression that will do this
+    def get_case_insensitive_re(v):
+        v = re.escape(v)
+        result = ''
+        for c in v:
+            if c.isalpha():
+                result = result + '[' + c.upper() + c.lower() + ']'
+            else:
+                result = result + c
+        return result
+        
     def list_dids(self, scope, filters, did_type='collection', ignore_case=False,
                   limit=None, offset=None, long=False, recursive=False,
                   ignore_dids=None, *, session: "Optional[Session]" = None):
@@ -77,7 +89,7 @@ class MetaCatRucioPlugin(DidMetaPlugin):
         for k, v in filters.items():
             if isinstance(v, str):
                 if ignore_case:
-                    where_items.append(f"{k} ~* '{re.escape(v)}'")
+                    where_items.append(f"{k} ~ '{self.get_case_insensitive_re(v)}'")
                 else:
                     where_items.append(f"{k} = '{v}'")
             else:
@@ -86,14 +98,14 @@ class MetaCatRucioPlugin(DidMetaPlugin):
                   
         if did_type in ("collection", "dataset", "container"):
             if where_clause:    where_clause = " having "+where_clause
-            query = f"datasets {scope}:'%' {where_clause}"
+            query = f"datasets {scope}:* {where_clause}"
             if recursive:
-                query += " with children recursively"
+                query += " with subsets recursively"
         else:
-            if where_clause:    where_clause = " where "+where_clause
-            query = f"files from {scope}:'%'"
+            if where_clause:    where_clause = " where namespace='" + scope + "' " + where_clause
+            query = f"files"
             if recursive:
-                query += " with children recursively"
+                query += " with subsets recursively"
             query += where_clause
         
         if limit is not None:
