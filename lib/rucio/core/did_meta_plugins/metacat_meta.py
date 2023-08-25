@@ -32,6 +32,10 @@ class MetaCatRucioPlugin(DidMetaPlugin):
             if metacat_url is None:
                 metacat_url = os.environ["METACAT_SERVER_URL"]
             client = MetaCatClient(metacat_url)
+            metacat_username = config.config_get('metadata', 'metacat_username')
+            metacat_password = config.config_get('metadata', 'metacat_password')
+            if metacat_username is not None and metacat_password is not None:
+                client.login_password(metacat_username, metacat_password)
         self.Client = client
         self.plugin_name = "METACAT"
         
