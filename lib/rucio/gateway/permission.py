@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any
 from rucio.common.exception import RSENotFound
 from rucio.common.types import InternalAccount, InternalScope
 from rucio.core import permission
+from rucio.core.permission import PermissionResult
 from rucio.core.rse import get_rse_id
 from rucio.db.sqla.session import read_session
 

@@ -116,6 +116,12 @@ class PermissionResult:
     def __bool__(self) -> bool:
         return self.allowed
 
+    # returns the message in a form suitable for appending to an exception string
+    def get_message(self) -> str:
+        if not self.message:
+            return ""
+        return ": " + self.message
+
 
 def has_permission(
         issuer: "InternalAccount",

@@ -48,8 +48,9 @@ def add_account(account, type_, email, issuer, vo='def', *, session: "Session"):
     validate_schema(name='account', obj=account, vo=vo)
 
     kwargs = {'account': account, 'type': type_}
-    if not rucio.gateway.permission.has_permission(issuer=issuer, vo=vo, action='add_account', kwargs=kwargs, session=session):
-        raise rucio.common.exception.AccessDenied('Account %s can not add account' % (issuer))
+    auth_result = rucio.gateway.permission.has_permission(issuer=issuer, vo=vo, action='add_account', kwargs=kwargs, session=session)
+    if not auth_result.allowed:
+        raise rucio.common.exception.AccessDenied('Account %s can not add account%s' % (issuer, auth_result.get_message()))
 
     account = InternalAccount(account, vo=vo)
 
