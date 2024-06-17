@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 
 
 @read_session
-def has_permission(issuer: str, action: str, kwargs: dict[str, Any], vo: str = 'def', *, session: "Session") -> bool:
+def has_permission(issuer: str, action: str, kwargs: dict[str, Any], vo: str = 'def', *, session: "Session") -> PermissionResult:
     """
     Checks if an account has the specified permission to
     execute an action with parameters.

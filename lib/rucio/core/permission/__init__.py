@@ -108,7 +108,7 @@ class PermissionResult:
     Represents the result of a permission check, allowing an optional message to be
     included to give the user more information.
     """
-    def __init__(self, allowed: bool, message: "Optional[str]" = None) -> None:
+    def __init__(self, allowed: bool, message: "Optional[str]" = "") -> None:
         self.allowed = allowed
         self.message = message
 
@@ -128,6 +128,6 @@ def has_permission(
         load_permission_for_vo(issuer.vo)
     result = permission_modules[issuer.vo].has_permission(issuer, action, kwargs, session=session)
     # continue to support policy packages that just return a boolean and no message
-    if type(result) == bool:
-        result = PermissionResult(allowed)
+    if isinstance(result, bool):
+        result = PermissionResult(result)
     return result
