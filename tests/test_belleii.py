@@ -17,7 +17,6 @@ from datetime import datetime
 import pytest
 
 from rucio.common.exception import InvalidObject
-from rucio.common.schema.belleii import validate_schema
 from rucio.common.utils import extract_scope, generate_uuid
 from rucio.core.config import set as config_set
 from rucio.tests.common import did_name_generator, skip_non_belleii
@@ -121,6 +120,7 @@ def test_dirac_addfile_with_parents_meta(rse_factory, did_factory, root_account,
 @skip_non_belleii
 def test_belle2_schema(rse_factory, did_factory, root_account, did_client):
     """ BELLE2 SCHEMA (COMMON): Basic tests on Belle II schema """
+    from rucio.common.schema.belleii import validate_schema
     bad_paths = ['invalid_name', '/belle/invalid@/did']
     for path in bad_paths:
         scope, name = extract_scope(path, [])
