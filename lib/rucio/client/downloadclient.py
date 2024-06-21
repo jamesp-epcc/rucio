@@ -1365,7 +1365,7 @@ class DownloadClient:
                     file_did_path = file_did.name
                     if input_did != file_did:
                         # if datasets were given: prepare the destination paths for each dataset
-                        if self.extract_scope_convention == 'belleii' and file_did_path.startswith('/'):
+                        if file_did_path.startswith('/'):
                             file_did_path = file_did_path.split('/')[-1]
                         path = os.path.join(self._prepare_dest_dir(base_dir, input_did.name, no_subdir), file_did_path)
                     else:
@@ -1560,15 +1560,11 @@ class DownloadClient:
             did_scope = did[0]
             did_name = did[1]
         elif len(did) == 1:
-            if self.extract_scope_convention == 'belleii':
-                scopes = [scope for scope in self.client.list_scopes()]
-                did_scope, did_name = extract_scope(did[0], scopes)
-            else:
-                did = did_str.split('.')
-                did_scope = did[0]
-                if did_scope == 'user' or did_scope == 'group':
-                    did_scope = '%s.%s' % (did[0], did[1])
-                did_name = did_str
+            did = did_str.split('.')
+            did_scope = did[0]
+            if did_scope == 'user' or did_scope == 'group':
+                did_scope = '%s.%s' % (did[0], did[1])
+            did_name = did_str
         else:
             raise InputValidationError('%s is not a valid DID. To many colons.' % did_str)
 
