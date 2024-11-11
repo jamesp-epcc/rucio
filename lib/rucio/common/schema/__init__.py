@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import importlib
+import logging
 from configparser import NoOptionError, NoSectionError
 from os import environ
 from typing import TYPE_CHECKING, Any
@@ -22,6 +23,8 @@ from rucio.common.plugins import check_policy_package_version
 
 if TYPE_CHECKING:
     from types import ModuleType
+
+LOGGER = logging.getLogger('policy')
 
 # dictionary of schema modules for each VO
 schema_modules: dict[str, "ModuleType"] = {}
@@ -61,15 +64,35 @@ if not multivo:
     try:
         module = importlib.import_module(POLICY)
     except ModuleNotFoundError:
-        raise exception.PolicyPackageNotFound(POLICY)
+        # if policy package does not contain schema module, load fallback module instead
+        # this allows a policy package to omit modules that do not need customisation
+        try:
+            LOGGER.warning('Unable to load schema module %s from policy package, falling back to %s'
+                           % (POLICY, GENERIC_FALLBACK))
+            POLICY = 'rucio.common.schema.' + GENERIC_FALLBACK.lower()
+            module = importlib.import_module(POLICY)
+        except ModuleNotFoundError:
+            raise exception.PolicyPackageNotFound(POLICY)
+        except ImportError:
+            raise exception.ErrorLoadingPolicyPackage(POLICY)
     except ImportError:
         raise exception.ErrorLoadingPolicyPackage(POLICY)
 
     schema_modules["def"] = module
-    scope_name_regexps.append(module.SCOPE_NAME_REGEXP)
+    if hasattr(module, 'SCOPE_NAME_REGEXP'):
+        scope_name_regexps.append(module.SCOPE_NAME_REGEXP)
+
+    try:
+        POLICY = 'rucio.common.schema.' + GENERIC_FALLBACK.lower()
+        generic_module = importlib.import_module(POLICY)
+    except ModuleNotFoundError:
+        raise exception.PolicyPackageNotFound(POLICY)
+    except ImportError:
+        raise exception.ErrorLoadingPolicyPackage(POLICY)
 
 
 def load_schema_for_vo(vo: str) -> None:
+    global generic_module
     GENERIC_FALLBACK = 'generic_multi_vo'
     if config.config_has_section('policy'):
         try:
@@ -93,22 +116,45 @@ def load_schema_for_vo(vo: str) -> None:
     try:
         module = importlib.import_module(POLICY)
     except ModuleNotFoundError:
-        raise exception.PolicyPackageNotFound(POLICY)
+        # if policy package does not contain schema module, load fallback module instead
+        # this allows a policy package to omit modules that do not need customisation
+        try:
+            LOGGER.warning('Unable to load schema module %s from policy package, falling back to %s'
+                           % (POLICY, GENERIC_FALLBACK))
+            POLICY = 'rucio.common.schema.' + GENERIC_FALLBACK.lower()
+            module = importlib.import_module(POLICY)
+        except ModuleNotFoundError:
+            raise exception.PolicyPackageNotFound(POLICY)
+        except ImportError:
+            raise exception.ErrorLoadingPolicyPackage(POLICY)
     except ImportError:
         raise exception.ErrorLoadingPolicyPackage(POLICY)
 
     schema_modules[vo] = module
 
+    try:
+        POLICY = 'rucio.common.schema.' + GENERIC_FALLBACK.lower()
+        generic_module = importlib.import_module(POLICY)
+    except ModuleNotFoundError:
+        raise exception.PolicyPackageNotFound(POLICY)
+    except ImportError:
+        raise exception.ErrorLoadingPolicyPackage(POLICY)
+
 
 def validate_schema(name: str, obj: Any, vo: str = 'def') -> None:
     if vo not in schema_modules:
         load_schema_for_vo(vo)
+    if not hasattr(schema_modules[vo], 'validate_schema'):
+        generic_module.validate_schema(name, obj)
+        return
     schema_modules[vo].validate_schema(name, obj)
 
 
 def get_schema_value(key: str, vo: str = 'def') -> Any:
     if vo not in schema_modules:
         load_schema_for_vo(vo)
+    if not hasattr(schema_modules[vo], key):
+        return getattr(generic_module, key)
     return getattr(schema_modules[vo], key)
 
 
