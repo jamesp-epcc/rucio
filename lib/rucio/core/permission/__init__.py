@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, Any
 
 from rucio.common import config, exception
 from rucio.common.plugins import check_policy_package_version
+import rucio.core.permission.generic
 
 if TYPE_CHECKING:
     from typing import Optional
@@ -155,6 +156,9 @@ def has_permission(
     if issuer.vo not in permission_modules:
         load_permission_for_vo(issuer.vo)
     result = permission_modules[issuer.vo].has_permission(issuer, action, kwargs, session=session)
+    # if this permission is missing from the policy package, fallback to generic
+    if result is None:
+        result = rucio.core.permission.generic.has_permission(issuer, action, kwargs, session=session)
     # continue to support policy packages that just return a boolean and no message
     if isinstance(result, bool):
         result = PermissionResult(result)
