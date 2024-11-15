@@ -18,9 +18,9 @@ from configparser import NoOptionError, NoSectionError
 from os import environ
 from typing import TYPE_CHECKING, Any
 
+import rucio.core.permission.generic
 from rucio.common import config, exception
 from rucio.common.plugins import check_policy_package_version
-import rucio.core.permission.generic
 
 if TYPE_CHECKING:
     from typing import Optional
