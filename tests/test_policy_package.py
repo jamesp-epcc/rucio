@@ -20,6 +20,7 @@ import rucio.common.schema
 import rucio.core.permission
 from rucio.common.types import InternalAccount
 
+
 class TestPolicyPackage:
 
     @pytest.mark.noparallel(reason='changes global permission modules dictionary')
