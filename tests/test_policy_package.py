@@ -49,10 +49,10 @@ class TestPolicyPackage:
         rucio.common.schema.schema_modules['def'] = importlib.import_module('tests.mocks.schema_diff')
 
         # check that overriden value is as expected
-        assert rucio.common.schema.get_schema_value('NAME_LENGTH') == 1000
+        assert rucio.common.schema.get_schema_value('SCOPE_LENGTH') == 50
 
         # check that omitted value falls back to generic module
-        assert rucio.common.schema.get_schema_value('SCOPE_LENGTH') == 25
+        assert rucio.common.schema.get_schema_value('NAME_LENGTH') == 250
         
         # restore original schema module
         rucio.common.schema.schema_modules['def'] = old_module

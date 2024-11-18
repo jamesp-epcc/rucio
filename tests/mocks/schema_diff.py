@@ -14,9 +14,9 @@
 
 # mock schema module that overrides only some values
 
-NAME_LENGTH = 1000
+SCOPE_LENGTH = 50
 
-NAME = {"description": "Data Identifier name",
-        "type": "string",
-        "maxLength": NAME_LENGTH,
-        "pattern": "^[A-Za-z0-9][A-Za-z0-9\\.\\-\\_]*$"}
+SCOPE = {"description": "Scope name",
+         "type": "string",
+         "maxLength": SCOPE_LENGTH,
+         "pattern": "^[a-zA-Z_\\-.0-9]+$"}
