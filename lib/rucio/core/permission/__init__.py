@@ -155,7 +155,11 @@ def has_permission(
 ) -> PermissionResult:
     if issuer.vo not in permission_modules:
         load_permission_for_vo(issuer.vo)
-    result = permission_modules[issuer.vo].has_permission(issuer, action, kwargs, session=session)
+    try:
+        result = permission_modules[issuer.vo].has_permission(issuer, action, kwargs, session=session)
+    except TypeError:
+        # will be thrown if policy package is missing the action in its perm dictionary
+        result = None
     # if this permission is missing from the policy package, fallback to generic
     if result is None:
         result = rucio.core.permission.generic.has_permission(issuer, action, kwargs, session=session)
