@@ -15,36 +15,41 @@
 from jsonschema import ValidationError, validate
 
 from rucio.common.exception import InvalidObject
+from rucio.common.schema import define_schema_value
 
-IS_GENERIC_MODULE = true
+IS_GENERIC_MODULE = True
 
-ACCOUNT_LENGTH = 29
+ACCOUNT_LENGTH = define_schema_value("ACCOUNT_LENGTH", 29)
 
-ACCOUNT = {"description": "Account name",
-           "type": "string",
-           "maxLength": ACCOUNT_LENGTH - 4,
-           "pattern": "^[a-z0-9-_]+$"}
-
-
-ACCOUNTS = {"description": "Array of accounts",
-            "type": "array",
-            "items": ACCOUNT,
-            "minItems": 0,
-            "maxItems": 1000}
+ACCOUNT = define_schema_value("ACCOUNT",
+                              {"description": "Account name",
+                               "type": "string",
+                               "maxLength": ACCOUNT_LENGTH - 4,
+                               "pattern": "^[a-z0-9-_]+$"})
 
 
-ACCOUNT_TYPE = {"description": "Account type",
-                "type": "string",
-                "enum": ["USER", "GROUP", "SERVICE"]}
+ACCOUNTS = define_schema_value("ACCOUNTS",
+                               {"description": "Array of accounts",
+                                "type": "array",
+                                "items": ACCOUNT,
+                                "minItems": 0,
+                                "maxItems": 1000})
 
-ACTIVITY = {"description": "Activity name",
-            "type": "string",
-            "enum": ["Data Brokering", "Data Consolidation", "Data Rebalancing",
-                     "Debug", "Express", "Functional Test", "Group Subscriptions",
-                     "Production Input", "Production Output",
-                     "Analysis Input", "Analysis Output", "Staging",
-                     "T0 Export", "T0 Tape", "Upload/Download (Job)",
-                     "Upload/Download (User)", "User Subscriptions"]}
+
+ACCOUNT_TYPE = define_schema_value("ACCOUNT_TYPE",
+                                   {"description": "Account type",
+                                    "type": "string",
+                                    "enum": ["USER", "GROUP", "SERVICE"]})
+
+ACTIVITY = define_schema_value("ACTIVITY",
+                               {"description": "Activity name",
+                                "type": "string",
+                                "enum": ["Data Brokering", "Data Consolidation", "Data Rebalancing",
+                                         "Debug", "Express", "Functional Test", "Group Subscriptions",
+                                         "Production Input", "Production Output",
+                                         "Analysis Input", "Analysis Output", "Staging",
+                                         "T0 Export", "T0 Tape", "Upload/Download (Job)",
+                                         "Upload/Download (User)", "User Subscriptions"]})
 
 SCOPE_LENGTH = 29
 

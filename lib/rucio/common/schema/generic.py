@@ -17,7 +17,7 @@ from jsonschema import ValidationError, validate
 from rucio.common.exception import InvalidObject
 from rucio.common.schema import define_schema_value
 
-IS_GENERIC_MODULE = true
+IS_GENERIC_MODULE = True
 
 ACCOUNT_LENGTH = define_schema_value("ACCOUNT_LENGTH", 25)
 
