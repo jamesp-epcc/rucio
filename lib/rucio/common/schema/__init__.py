@@ -136,7 +136,7 @@ def load_schema_for_vo(vo: str) -> None:
         raise exception.ErrorLoadingPolicyPackage(policy)
 
     schema_modules[vo] = module
-    module.setattr('CURRENT_VO', vo)
+    #setattr(module, 'CURRENT_VO', vo)
     if not _is_multivo():
         if hasattr(module, 'SCOPE_NAME_REGEXP'):
             scope_name_regexps.append(module.SCOPE_NAME_REGEXP)

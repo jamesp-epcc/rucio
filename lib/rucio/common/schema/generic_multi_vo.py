@@ -51,116 +51,145 @@ ACTIVITY = define_schema_value("ACTIVITY",
                                          "T0 Export", "T0 Tape", "Upload/Download (Job)",
                                          "Upload/Download (User)", "User Subscriptions"]})
 
-SCOPE_LENGTH = 29
+SCOPE_LENGTH = define_schema_value("SCOPE_LENGTH", 29)
 
-SCOPE = {"description": "Scope name",
-         "type": "string",
-         "maxLength": SCOPE_LENGTH - 4,
-         "pattern": "^[a-zA-Z_\\-.0-9]+$"}
+SCOPE = define_schema_value("SCOPE", {"description": "Scope name",
+                                      "type": "string",
+                                      "maxLength": SCOPE_LENGTH - 4,
+                                      "pattern": "^[a-zA-Z_\\-.0-9]+$"})
 
-R_SCOPE = {"description": "Scope name",
-           "type": "string",
-           "pattern": "\\w"}
+R_SCOPE = define_schema_value("R_SCOPE",
+                              {"description": "Scope name",
+                               "type": "string",
+                               "pattern": "\\w"})
 
-NAME_LENGTH = 250
+NAME_LENGTH = define_schema_value("NAME_LENGTH", 250)
 
-NAME = {"description": "Data Identifier name",
-        "type": "string",
-        "maxLength": NAME_LENGTH,
-        "pattern": "^[A-Za-z0-9][A-Za-z0-9\\.\\-\\_]*$"}
+NAME = define_schema_value("NAME",
+                           {"description": "Data Identifier name",
+                            "type": "string",
+                            "maxLength": NAME_LENGTH,
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9\\.\\-\\_]*$"})
 
-R_NAME = {"description": "Data Identifier name",
-          "type": "string",
-          "pattern": "\\w"}
+R_NAME = define_schema_value("R_NAME",
+                             {"description": "Data Identifier name",
+                              "type": "string",
+                              "pattern": "\\w"})
 
-LOCKED = {"description": "Rule locked status",
-          "type": ["boolean", "null"]}
+LOCKED = define_schema_value("LOCKED",
+                             {"description": "Rule locked status",
+                              "type": ["boolean", "null"]})
 
-ASK_APPROVAL = {"description": "Rule approval request",
-                "type": ["boolean", "null"]}
+ASK_APPROVAL = define_schema_value("ASK_APPROVAL",
+                                   {"description": "Rule approval request",
+                                    "type": ["boolean", "null"]})
 
-ASYNCHRONOUS = {"description": "Asynchronous rule creation",
-                "type": ["boolean", "null"]}
+ASYNCHRONOUS = define_schema_value("ASYNCHRONOUS",
+                                   {"description": "Asynchronous rule creation",
+                                    "type": ["boolean", "null"]})
 
-DELAY_INJECTION = {"description": "Time (in seconds) to wait before starting applying the rule. Implies asynchronous rule creation.",
-                   "type": ["integer", "null"]}
+DELAY_INJECTION = define_schema_value("DELAY_INJECTION",
+                                      {"description": "Time (in seconds) to wait before starting applying the rule. Implies asynchronous rule creation.",
+                                       "type": ["integer", "null"]})
 
-PURGE_REPLICAS = {"description": "Rule purge replica status",
-                  "type": "boolean"}
+PURGE_REPLICAS = define_schema_value("PURGE_REPLICAS",
+                                     {"description": "Rule purge replica status",
+                                      "type": "boolean"})
 
-IGNORE_AVAILABILITY = {"description": "Rule ignore availability status",
-                       "type": "boolean"}
+IGNORE_AVAILABILITY = define_schema_value("IGNORE_AVAILABILITY",
+                                          {"description": "Rule ignore availability status",
+                                           "type": "boolean"})
 
-RSE = {"description": "RSE name",
-       "type": "string",
-       "pattern": "^([A-Z0-9]+([_-][A-Z0-9]+)*)$"}
+RSE = define_schema_value("RSE",
+                          {"description": "RSE name",
+                           "type": "string",
+                           "pattern": "^([A-Z0-9]+([_-][A-Z0-9]+)*)$"})
 
-RSE_ATTRIBUTE = {"description": "RSE attribute",
-                 "type": "string",
-                 "pattern": r'([A-Za-z0-9\._-]+[=<>][A-Za-z0-9_-]+)'}
+RSE_ATTRIBUTE = define_schema_value("RSE_ATTRIBUTE",
+                                    {"description": "RSE attribute",
+                                     "type": "string",
+                                     "pattern": r'([A-Za-z0-9\._-]+[=<>][A-Za-z0-9_-]+)'})
 
-DEFAULT_RSE_ATTRIBUTE = {"description": "Default RSE attribute",
-                         "type": "string",
-                         "pattern": r'([A-Z0-9]+([_-][A-Z0-9]+)*)'}
+DEFAULT_RSE_ATTRIBUTE = define_schema_value("DEFAULT_RSE_ATTRIBUTE",
+                                            {"description": "Default RSE attribute",
+                                             "type": "string",
+                                             "pattern": r'([A-Z0-9]+([_-][A-Z0-9]+)*)'})
 
-REPLICA_STATE = {"description": "Replica state",
-                 "type": "string",
-                 "enum": ["AVAILABLE", "UNAVAILABLE", "COPYING", "BEING_DELETED", "BAD", "SOURCE", "A", "U", "C", "B", "D", "S"]}
+REPLICA_STATE = define_schema_value("REPLICA_STATE",
+                                    {"description": "Replica state",
+                                     "type": "string",
+                                     "enum": ["AVAILABLE", "UNAVAILABLE", "COPYING", "BEING_DELETED", "BAD", "SOURCE", "A", "U", "C", "B", "D", "S"]})
 
-DATE = {"description": "Date",
-        "type": "string",
-        "pattern": r'((Mon)|(Tue)|(Wed)|(Thu)|(Fri)|(Sat)|(Sun))[,]\s\d{2}\s(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s\d{4}\s(0\d|1\d|2[0-3])(\:)(0\d|1\d|2\d|3\d|4\d|5\d)(\:)(0\d|1\d|2\d|3\d|4\d|5\d)\s(UTC)'}
+DATE = define_schema_value("DATE",
+                           {"description": "Date",
+                            "type": "string",
+                            "pattern": r'((Mon)|(Tue)|(Wed)|(Thu)|(Fri)|(Sat)|(Sun))[,]\s\d{2}\s(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s\d{4}\s(0\d|1\d|2[0-3])(\:)(0\d|1\d|2\d|3\d|4\d|5\d)(\:)(0\d|1\d|2\d|3\d|4\d|5\d)\s(UTC)'})
 
-DID_TYPE = {"description": "DID type",
-            "type": "string",
-            "enum": ["DATASET", "CONTAINER", "FILE", "F"]}
+DID_TYPE = define_schema_value("DID_TYPE",
+                               {"description": "DID type",
+                                "type": "string",
+                                "enum": ["DATASET", "CONTAINER", "FILE", "F"]})
 
-GROUPING = {"description": "Rule grouping",
-            "type": ["string", "null"],
-            "enum": ["DATASET", "NONE", "ALL", None]}
+GROUPING = define_schema_value("GROUPING",
+                               {"description": "Rule grouping",
+                                "type": ["string", "null"],
+                                "enum": ["DATASET", "NONE", "ALL", None]})
 
-NOTIFY = {"description": "Rule notification setting",
-          "type": ["string", "null"],
-          "enum": ["Y", "C", "N", "P", None]}
+NOTIFY = define_schema_value("NOTIFY",
+                             {"description": "Rule notification setting",
+                              "type": ["string", "null"],
+                              "enum": ["Y", "C", "N", "P", None]})
 
-COMMENT = {"description": "Rule comment",
-           "type": ["string", "null"],
-           "maxLength": 250}
+COMMENT = define_schema_value("COMMENT",
+                              {"description": "Rule comment",
+                               "type": ["string", "null"],
+                               "maxLength": 250})
 
-METADATA = {"description": "Rule wfms metadata",
-            "type": ["string", "null"],
-            "maxLength": 3999}
+METADATA = define_schema_value("METADATA",
+                               {"description": "Rule wfms metadata",
+                                "type": ["string", "null"],
+                                "maxLength": 3999})
 
-BYTES = {"description": "Size in bytes",
-         "type": "integer"}
+BYTES = define_schema_value("BYTES",
+                            {"description": "Size in bytes",
+                             "type": "integer"})
 
-ADLER32 = {"description": "adler32",
-           "type": "string",
-           "pattern": "^[a-fA-F\\d]{8}$"}
+ADLER32 = define_schema_value("ADLER32",
+                              {"description": "adler32",
+                               "type": "string",
+                               "pattern": "^[a-fA-F\\d]{8}$"})
 
-WEIGHT = {"description": "Rule weight",
-          "type": ["string", "null"]}
+WEIGHT = define_schema_value("WEIGHT",
+                             {"description": "Rule weight",
+                              "type": ["string", "null"]})
 
-MD5 = {"description": "md5",
-       "type": "string",
-       "pattern": "^[a-fA-F\\d]{32}$"}
+MD5 = define_schema_value("MD5",
+                          {"description": "md5",
+                           "type": "string",
+                           "pattern": "^[a-fA-F\\d]{32}$"})
 
-UUID = {"description": "Universally Unique Identifier (UUID)",
-        "type": "string",
-        "pattern": '^(\\{){0,1}[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}(\\}){0,1}$'}
+UUID = define_schema_value("UUID",
+                           {"description": "Universally Unique Identifier (UUID)",
+                            "type": "string",
+                            "pattern": '^(\\{){0,1}[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}(\\}){0,1}$'})
 
-META = {"description": "Data Identifier(DID) metadata",
-        "type": "object",
-        "properties": {"guid": UUID},
-        "additionalProperties": True}
+META = define_schema_value("META",
+                           {"description": "Data Identifier(DID) metadata",
+                            "type": "object",
+                            "properties": {"guid": UUID},
+                            "additionalProperties": True})
 
-PFN = {"description": "Physical File Name", "type": "string"}
+PFN = define_schema_value("PFN",
+                          {"description": "Physical File Name", "type": "string"})
 
-COPIES = {"description": "Number of replica copies", "type": "integer"}
+COPIES = define_schema_value("COPIES",
+                             {"description": "Number of replica copies", "type": "integer"})
 
-RSE_EXPRESSION = {"description": "RSE expression", "type": "string"}
+RSE_EXPRESSION = define_schema_value("RSE_EXPRESSION",
+                                     {"description": "RSE expression", "type": "string"})
 
-SOURCE_REPLICA_EXPRESSION = {"description": "RSE expression", "type": ["string", "null"]}
+SOURCE_REPLICA_EXPRESSION = define_schema_value("SOURCE_REPLICA_EXPRESSION",
+                                                {"description": "RSE expression", "type": ["string", "null"]})
 
 LIFETIME = {"description": "Lifetime", "type": "number"}
 
