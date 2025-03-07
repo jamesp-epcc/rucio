@@ -51,52 +51,6 @@ def _get_generic_schema_module():
     return importlib.import_module('rucio.common.schema.' + generic_fallback)
 
 
-# multi-VO version loads schema per-VO on demand
-# we can't get a list of VOs here because the database might not
-# be available as this is imported during the bootstrapping process
-#if not _is_multivo():
-#    GENERIC_FALLBACK = 'generic'
-
-#    if config.config_has_section('policy'):
-#        try:
-#            if 'RUCIO_POLICY_PACKAGE' in environ:
-#                policy = environ['RUCIO_POLICY_PACKAGE']
-#            else:
-#                policy = config.config_get('policy', 'package', check_config_table=False)
-#            check_policy_package_version(policy)
-#            policy = policy + ".schema"
-#        except (NoOptionError, NoSectionError):
-            # fall back to old system for now
-#            try:
-#                policy = config.config_get('policy', 'schema', check_config_table=False)
-#            except (NoOptionError, NoSectionError):
-#                policy = GENERIC_FALLBACK
-#            policy = 'rucio.common.schema.' + policy.lower()
-#    else:
-#        policy = 'rucio.common.schema.' + GENERIC_FALLBACK.lower()
-
-#    try:
-#        module = importlib.import_module(policy)
-#    except ModuleNotFoundError:
-        # if policy package does not contain schema module, load fallback module instead
-        # this allows a policy package to omit modules that do not need customisation
-#        try:
-#            LOGGER.warning('Unable to load schema module %s from policy package, falling back to %s'
-#                           % (policy, GENERIC_FALLBACK))
-#            policy = 'rucio.common.schema.' + GENERIC_FALLBACK.lower()
-#            module = importlib.import_module(policy)
-#        except ModuleNotFoundError:
-#            raise exception.PolicyPackageNotFound(policy)
-#        except ImportError:
-#            raise exception.ErrorLoadingPolicyPackage(policy)
-#    except ImportError:
-#        raise exception.ErrorLoadingPolicyPackage(policy)
-
-#    schema_modules["def"] = module
-#    if hasattr(module, 'SCOPE_NAME_REGEXP'):
-#        scope_name_regexps.append(module.SCOPE_NAME_REGEXP)
-
-
 def resolve_placeholders(schema: Any, fallback_module: "ModuleType", module: "ModuleType" = None):
     if isinstance(schema, dict):
         result = {}
@@ -171,7 +125,6 @@ def load_schema_for_vo(vo: str) -> None:
         raise exception.ErrorLoadingPolicyPackage(policy)
 
     schema_modules[vo] = module
-    #setattr(module, 'CURRENT_VO', vo)
     if not _is_multivo():
         if hasattr(module, 'SCOPE_NAME_REGEXP'):
             scope_name_regexps.append(module.SCOPE_NAME_REGEXP)
@@ -188,29 +141,12 @@ def validate_schema(name: str, obj: Any, vo: str = 'def') -> None:
             validate(obj, schema)
     except ValidationError as error:  # NOQA, pylint: disable=W0612
         raise exception.InvalidObject(f'Problem validating {name}: {error}')
-    
-    #if not hasattr(schema_modules[vo], 'validate_schema'):
-    #    _get_generic_schema_module().validate_schema(name, obj)
-    #    return
-    #schema_modules[vo].validate_schema(name, obj)
 
 
 def get_schema_value(key: str, vo: str = 'def') -> Any:
     if vo not in schema_modules:
         load_schema_for_vo(vo)
     return resolve_placeholders("%%" + key, _get_generic_schema_module(), schema_modules[vo])
-    #if not hasattr(schema_modules[vo], key):
-    #    value = getattr(_get_generic_schema_module(), key)
-    #else:
-    #    value = getattr(schema_modules[vo], key)
-
-
-#def define_schema_value(key: str, value: Any, vo: str = 'def') -> Any:
-#    if hasattr(schema_modules[vo], 'IS_GENERIC_MODULE') and getattr(schema_modules[vo], 'IS_GENERIC_MODULE'):
-#        return value
-#    if not hasattr(schema_modules[vo], key):
-#        return value
-#    return getattr(schema_modules[vo], key)
 
 
 def get_scope_name_regexps() -> list[str]:
