@@ -135,6 +135,7 @@ def load_schema_for_vo(vo: str) -> None:
         raise exception.ErrorLoadingPolicyPackage(policy)
 
     schema_modules[vo] = module
+    module.setattr('CURRENT_VO', vo)
 
 
 def validate_schema(name: str, obj: Any, vo: str = 'def') -> None:
@@ -151,6 +152,14 @@ def get_schema_value(key: str, vo: str = 'def') -> Any:
         load_schema_for_vo(vo)
     if not hasattr(schema_modules[vo], key):
         return getattr(_get_generic_schema_module(), key)
+    return getattr(schema_modules[vo], key)
+
+
+def define_schema_value(key: str, value: Any, vo: str = 'def') -> Any:
+    if hasattr(schema_modules[vo], 'IS_GENERIC_MODULE') and getattr(schema_modules[vo], 'IS_GENERIC_MODULE'):
+        return value
+    if not hasattr(schema_modules[vo], key):
+        return value
     return getattr(schema_modules[vo], key)
 
 

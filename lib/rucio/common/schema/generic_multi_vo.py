@@ -16,6 +16,8 @@ from jsonschema import ValidationError, validate
 
 from rucio.common.exception import InvalidObject
 
+IS_GENERIC_MODULE = true
+
 ACCOUNT_LENGTH = 29
 
 ACCOUNT = {"description": "Account name",
