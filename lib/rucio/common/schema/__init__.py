@@ -187,7 +187,7 @@ def validate_schema(name: str, obj: Any, vo: str = 'def') -> None:
         if obj:
             validate(obj, schema)
     except ValidationError as error:  # NOQA, pylint: disable=W0612
-        raise InvalidObject(f'Problem validating {name}: {error}')
+        raise exception.InvalidObject(f'Problem validating {name}: {error}')
     
     #if not hasattr(schema_modules[vo], 'validate_schema'):
     #    _get_generic_schema_module().validate_schema(name, obj)
