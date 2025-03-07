@@ -100,7 +100,7 @@ def _get_generic_schema_module():
 def resolve_placeholders(schema: Any, fallback_module: "ModuleType", module: "ModuleType" = None):
     if isinstance(schema, dict):
         result = {}
-        for k, v in schema:
+        for k, v in schema.items():
             result[k] = resolve_placeholders(v, fallback_module, module)
     elif isinstance(schema, list):
         result = []
