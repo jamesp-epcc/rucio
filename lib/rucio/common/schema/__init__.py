@@ -16,6 +16,7 @@ import functools
 import importlib
 import logging
 from configparser import NoOptionError, NoSectionError
+from jsonschema import ValidationError, validate
 from os import environ
 from typing import TYPE_CHECKING, Any
 
@@ -96,6 +97,40 @@ def _get_generic_schema_module():
 #        scope_name_regexps.append(module.SCOPE_NAME_REGEXP)
 
 
+def resolve_placeholders(schema: Any, fallback_module: "ModuleType", module: "ModuleType" = None):
+    if isinstance(schema, dict):
+        result = {}
+        for k, v in schema:
+            result[k] = resolve_placeholders(v, fallback_module, module)
+    elif isinstance(schema, list):
+        result = []
+        for v in schema:
+            result.append(resolve_placeholders(v, fallback_module, module))
+    elif isinstance(schema, str):
+        result = schema
+        if schema.startswith("%%"):
+            name = schema[2:]
+            # allow adding or subtracting a constant
+            constant = 0
+            if "-" in name:
+                pos = name.find("-")
+                name = name[:pos].strip()
+                constant = -int(name[pos+1])
+            if "+" in name:
+                pos = name.find("+")
+                name = name[:pos].strip()
+                constant = int(name[pos+1])
+            if module is not None and hasattr(module, name):
+                result = getattr(module, name)
+            else:
+                result = getattr(fallback_module, name)
+            result = resolve_placeholders(result, fallback_module, module)
+            if constant != 0: result += constant
+    else:
+        result = schema
+    return result
+
+
 def load_schema_for_vo(vo: str) -> None:
     generic_fallback = 'generic_multi_vo' if _is_multivo() else 'generic'
     if config.config_has_section('policy'):
@@ -145,26 +180,37 @@ def load_schema_for_vo(vo: str) -> None:
 def validate_schema(name: str, obj: Any, vo: str = 'def') -> None:
     if vo not in schema_modules:
         load_schema_for_vo(vo)
-    if not hasattr(schema_modules[vo], 'validate_schema'):
-        _get_generic_schema_module().validate_schema(name, obj)
-        return
-    schema_modules[vo].validate_schema(name, obj)
+    schemas = getattr(schema_modules[vo], "SCHEMAS") if hasattr(schema_modules[vo], "SCHEMAS") else getattr(_get_generic_schema_module(), "SCHEMAS")
+    schema = schemas.get(name, {})
+    schema = resolve_placeholders(schema, _get_generic_schema_module(), schema_modules[vo])
+    try:
+        if obj:
+            validate(obj, schema)
+    except ValidationError as error:  # NOQA, pylint: disable=W0612
+        raise InvalidObject(f'Problem validating {name}: {error}')
+    
+    #if not hasattr(schema_modules[vo], 'validate_schema'):
+    #    _get_generic_schema_module().validate_schema(name, obj)
+    #    return
+    #schema_modules[vo].validate_schema(name, obj)
 
 
 def get_schema_value(key: str, vo: str = 'def') -> Any:
     if vo not in schema_modules:
         load_schema_for_vo(vo)
-    if not hasattr(schema_modules[vo], key):
-        return getattr(_get_generic_schema_module(), key)
-    return getattr(schema_modules[vo], key)
+    return resolve_placeholders("%%" + key, _get_generic_schema_module(), schema_modules[vo])
+    #if not hasattr(schema_modules[vo], key):
+    #    value = getattr(_get_generic_schema_module(), key)
+    #else:
+    #    value = getattr(schema_modules[vo], key)
 
 
-def define_schema_value(key: str, value: Any, vo: str = 'def') -> Any:
-    if hasattr(schema_modules[vo], 'IS_GENERIC_MODULE') and getattr(schema_modules[vo], 'IS_GENERIC_MODULE'):
-        return value
-    if not hasattr(schema_modules[vo], key):
-        return value
-    return getattr(schema_modules[vo], key)
+#def define_schema_value(key: str, value: Any, vo: str = 'def') -> Any:
+#    if hasattr(schema_modules[vo], 'IS_GENERIC_MODULE') and getattr(schema_modules[vo], 'IS_GENERIC_MODULE'):
+#        return value
+#    if not hasattr(schema_modules[vo], key):
+#        return value
+#    return getattr(schema_modules[vo], key)
 
 
 def get_scope_name_regexps() -> list[str]:
