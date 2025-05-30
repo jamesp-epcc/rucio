@@ -236,13 +236,11 @@ def parse_scope_name(scope_name: str, vo: Optional[str]) -> tuple[str, ...]:
     :returns: a (scope, name) tuple.
     """
 
-    if scope_name.count('/') != 1:
-        # scope and name are always separated by a single slash ('/', unencoded) in the request.
-        # If the server is configured with the 'NoDecode' option, other slashes will be encoded.
-        # This is just a sanity check that should never happen.
+    slash = scope_name.find('/')
+    if slash < 0:
         raise ValueError(f"Could not parse '{scope_name}' ({scope_name=}) with encoded '/' into scope and name.")
-
-    scope, name = scope_name.split('/', 1)
+    scope = scope_name[:slash]
+    name = scope_name[slash + 1:]
     name = unquote_plus(name)
     return scope, name
 
