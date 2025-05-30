@@ -15,8 +15,6 @@
 import itertools
 import json
 import logging
-import os
-import re
 from configparser import NoOptionError, NoSectionError
 from functools import wraps
 from time import time
@@ -33,7 +31,6 @@ from werkzeug.wrappers import Request, Response
 from rucio.common import config
 from rucio.common.constants import DEFAULT_VO, HTTPMethod
 from rucio.common.exception import CannotAuthenticate, DatabaseException, IdentityError, RucioException, UnsupportedRequestedContentType
-from rucio.common.schema import get_schema_value
 from rucio.common.utils import generate_uuid, render_json
 from rucio.core.vo import map_vo
 from rucio.gateway.authentication import validate_auth_token
