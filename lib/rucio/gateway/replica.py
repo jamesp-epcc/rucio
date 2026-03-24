@@ -337,6 +337,9 @@ def add_replicas(
         # check if the account has permission to add DIDs.
         new_files = find_files_with_missing_dids(files=files, session=session)
         if new_files:
+            for f in new_files:
+                # has_permission in gateway expects external scope, not internal
+                f['scope'] = f['scope'].external
             kwargs['dids'] = new_files
             if not permission.has_permission(issuer=issuer, vo=vo, action='add_dids', kwargs=kwargs, session=session):
                 raise exception.AccessDenied(
